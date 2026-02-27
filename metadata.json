@@ -1,0 +1,8 @@
+{
+  "name": "Blood Traking",
+  "description": "A smart blood donation and request platform with social feed, donor matching, and real-time notifications.",
+  "requestFramePermissions": [
+    "geolocation",
+    "notifications"
+  ]
+}
