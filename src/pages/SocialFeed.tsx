@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase/config';
+import { db, storage } from '../firebase/config';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
-import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, User, MoreVertical, Video, Play, X } from 'lucide-react';
+import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, User, MoreVertical, Video, Play, X, Loader2, Upload, Phone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { Post } from '../types';
 import { cn } from '../utils/helpers';
+
+import PostItem from '../components/PostItem';
 
 const SocialFeed = () => {
   const { t } = useTranslation();
@@ -15,9 +18,11 @@ const SocialFeed = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState('');
+  const [phone, setPhone] = useState('');
   const [mediaURL, setMediaURL] = useState('');
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
@@ -33,6 +38,26 @@ const SocialFeed = () => {
     return () => unsubscribe();
   }, []);
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    setUploading(true);
+    try {
+      const storageRef = ref(storage, `posts/${profile.uid}/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      
+      setMediaURL(url);
+      setMediaType(file.type.startsWith('video/') ? 'video' : 'image');
+      toast.success('File uploaded successfully!');
+    } catch (error: any) {
+      toast.error('Upload failed: ' + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || (!newPostContent.trim() && !mediaURL)) return;
@@ -44,6 +69,7 @@ const SocialFeed = () => {
         authorName: profile.name,
         authorPhoto: profile.photoURL || '',
         content: newPostContent,
+        phone: phone || null,
         type: 'general',
         likes: [],
         commentCount: 0,
@@ -52,6 +78,7 @@ const SocialFeed = () => {
         createdAt: new Date().toISOString()
       });
       setNewPostContent('');
+      setPhone('');
       setMediaURL('');
       setMediaType(null);
       toast.success(t('post') + ' shared!');
@@ -59,34 +86,6 @@ const SocialFeed = () => {
       toast.error(error.message);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleLike = async (postId: string, isLiked: boolean) => {
-    if (!profile) {
-      toast.error('Please login to like posts');
-      return;
-    }
-
-    try {
-      const postRef = doc(db, 'posts', postId);
-      await updateDoc(postRef, {
-        likes: isLiked ? arrayRemove(profile.uid) : arrayUnion(profile.uid)
-      });
-      
-      setPosts(posts.map(p => {
-        if (p.id === postId) {
-          return {
-            ...p,
-            likes: isLiked 
-              ? p.likes.filter(id => id !== profile.uid)
-              : [...p.likes, profile.uid]
-          };
-        }
-        return p;
-      }));
-    } catch (error) {
-      console.error("Error liking post:", error);
     }
   };
 
@@ -112,8 +111,19 @@ const SocialFeed = () => {
                 placeholder={t('share_update')}
                 value={newPostContent}
                 onChange={(e) => setNewPostContent(e.target.value)}
-                className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-none rounded-2xl p-4 focus:ring-2 focus:ring-red-600 outline-none resize-none min-h-[100px]"
+                className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-none rounded-2xl p-4 focus:ring-2 focus:ring-red-600 outline-none resize-none min-h-[100px] text-sm"
               />
+
+              <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl px-4 py-2 border border-zinc-100 dark:border-zinc-800">
+                <Phone className="h-4 w-4 text-zinc-400" />
+                <input
+                  type="tel"
+                  placeholder="Phone number (optional)"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="bg-transparent border-none outline-none text-sm w-full"
+                />
+              </div>
               
               {mediaURL && (
                 <div className="relative rounded-2xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
@@ -124,7 +134,7 @@ const SocialFeed = () => {
                     <X className="h-4 w-4" />
                   </button>
                   {mediaType === 'image' ? (
-                    <img src={mediaURL} alt="Preview" className="w-full h-auto max-h-60 object-cover" />
+                    <img src={mediaURL} alt="Preview" className="w-full h-auto max-h-80 object-cover" />
                   ) : (
                     <div className="aspect-video bg-zinc-900 flex items-center justify-center">
                       <Play className="h-12 w-12 text-white opacity-50" />
@@ -133,49 +143,47 @@ const SocialFeed = () => {
                 </div>
               )}
 
-              {(mediaType === 'image' || mediaType === 'video') && !mediaURL && (
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-zinc-500 uppercase">{mediaType === 'image' ? t('photo') : t('video')} URL</label>
-                  <input
-                    type="text"
-                    placeholder={`Paste ${mediaType} URL here...`}
-                    value={mediaURL}
-                    onChange={(e) => setMediaURL(e.target.value)}
-                    className="w-full px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
-                  />
+              {uploading && (
+                <div className="flex items-center justify-center p-8 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-700">
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="h-8 w-8 text-red-600 animate-spin" />
+                    <p className="text-sm font-medium text-zinc-500">Uploading media...</p>
+                  </div>
                 </div>
               )}
             </div>
           </div>
           <div className="flex justify-between items-center pt-2 border-t border-zinc-100 dark:border-zinc-800">
             <div className="flex gap-4">
-              <button 
-                onClick={() => { setMediaType('image'); setMediaURL(''); }}
-                className={cn(
-                  "flex items-center gap-2 font-medium transition-colors",
-                  mediaType === 'image' ? "text-red-600" : "text-zinc-500 hover:text-red-600"
-                )}
-              >
+              <label className="flex items-center gap-2 font-medium text-zinc-500 hover:text-red-600 transition-colors cursor-pointer">
                 <ImageIcon className="h-5 w-5" />
                 {t('photo')}
-              </button>
-              <button 
-                onClick={() => { setMediaType('video'); setMediaURL(''); }}
-                className={cn(
-                  "flex items-center gap-2 font-medium transition-colors",
-                  mediaType === 'video' ? "text-red-600" : "text-zinc-500 hover:text-red-600"
-                )}
-              >
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                />
+              </label>
+              <label className="flex items-center gap-2 font-medium text-zinc-500 hover:text-red-600 transition-colors cursor-pointer">
                 <Video className="h-5 w-5" />
                 {t('video')}
-              </button>
+                <input 
+                  type="file" 
+                  accept="video/*" 
+                  className="hidden" 
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                />
+              </label>
             </div>
             <button
               onClick={handleCreatePost}
-              disabled={submitting || (!newPostContent.trim() && !mediaURL)}
+              disabled={submitting || uploading || (!newPostContent.trim() && !mediaURL)}
               className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all disabled:opacity-50 flex items-center gap-2"
             >
-              <Send className="h-4 w-4" />
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {t('post')}
             </button>
           </div>
@@ -189,79 +197,9 @@ const SocialFeed = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          {posts.map((post, index) => {
-            const isLiked = profile ? post.likes.includes(profile.uid) : false;
-            return (
-              <motion.div
-                key={post.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-white dark:bg-zinc-900 rounded-3xl shadow-sm border border-zinc-100 dark:border-zinc-800 overflow-hidden"
-              >
-                <div className="p-6 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                        {post.authorPhoto ? (
-                          <img src={post.authorPhoto} alt={post.authorName} className="h-full w-full rounded-xl object-cover" />
-                        ) : (
-                          <User className="h-5 w-5 text-zinc-400" />
-                        )}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-zinc-900 dark:text-white">{post.authorName}</h4>
-                        <p className="text-xs text-zinc-500">{new Date(post.createdAt).toLocaleString()}</p>
-                      </div>
-                    </div>
-                    <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full">
-                      <MoreVertical className="h-5 w-5 text-zinc-400" />
-                    </button>
-                  </div>
-
-                  <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                    {post.content}
-                  </p>
-
-                  {post.mediaURL && (
-                    <div className="rounded-2xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
-                      {post.mediaType === 'video' ? (
-                        <div className="aspect-video bg-black relative group cursor-pointer">
-                          <video src={post.mediaURL} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-all">
-                            <Play className="h-12 w-12 text-white" />
-                          </div>
-                        </div>
-                      ) : (
-                        <img src={post.mediaURL} alt="Post content" className="w-full h-auto" />
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-6 pt-4 border-t border-zinc-50 dark:border-zinc-800/50">
-                    <button 
-                      onClick={() => handleLike(post.id, isLiked)}
-                      className={cn(
-                        "flex items-center gap-2 font-bold transition-colors",
-                        isLiked ? "text-red-600" : "text-zinc-500 hover:text-red-600"
-                      )}
-                    >
-                      <Heart className={cn("h-5 w-5", isLiked && "fill-current")} />
-                      {post.likes.length}
-                    </button>
-                    <button className="flex items-center gap-2 text-zinc-500 hover:text-blue-600 font-bold transition-colors">
-                      <MessageSquare className="h-5 w-5" />
-                      {post.commentCount}
-                    </button>
-                    <button className="flex items-center gap-2 text-zinc-500 hover:text-emerald-600 font-bold transition-colors">
-                      <Share2 className="h-5 w-5" />
-                      Share
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+          {posts.map((post) => (
+            <PostItem key={post.id} post={post} profile={profile} />
+          ))}
         </div>
       )}
     </div>

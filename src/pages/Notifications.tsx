@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, where, orderBy, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { Bell, Check, Trash2, Droplets, MessageSquare, ShieldCheck, Clock } from 'lucide-react';
@@ -13,34 +13,46 @@ const Notifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchNotifications = async () => {
-    if (!profile) return;
-    setLoading(true);
-    try {
-      const q = query(
-        collection(db, 'notifications'),
-        where('userId', '==', profile.uid),
-        orderBy('createdAt', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
-      setNotifications(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification)));
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchNotifications();
+    if (!profile) return;
+
+    setLoading(true);
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', profile.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notificationList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Notification));
+      // Sort in memory to avoid composite index requirement
+      notificationList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setNotifications(notificationList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching notifications:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [profile]);
 
   const markAsRead = async (id: string) => {
     try {
       await updateDoc(doc(db, 'notifications', id), { isRead: true });
-      setNotifications(notifications.map(n => n.id === id ? { ...n, isRead: true } : n));
     } catch (error) {
       toast.error('Failed to update notification');
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'notifications', id));
+      toast.success('Notification deleted');
+    } catch (error) {
+      toast.error('Failed to delete notification');
     }
   };
 
@@ -57,12 +69,13 @@ const Notifications = () => {
     <div className="max-w-3xl mx-auto px-4 py-12 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Notifications</h1>
-        <button 
-          onClick={fetchNotifications}
-          className="text-sm font-bold text-red-600 hover:underline"
-        >
-          Refresh
-        </button>
+        {notifications.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-1 bg-red-100 text-red-600 text-[10px] font-bold rounded-full">
+              {notifications.filter(n => !n.isRead).length} New
+            </span>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -90,10 +103,18 @@ const Notifications = () => {
               <div className="flex-1 space-y-1">
                 <div className="flex justify-between items-start">
                   <h3 className="font-bold text-zinc-900 dark:text-white">{notification.title}</h3>
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {new Date(notification.createdAt).toLocaleDateString()}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {new Date(notification.createdAt).toLocaleDateString()}
+                    </span>
+                    <button 
+                      onClick={() => deleteNotification(notification.id)}
+                      className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">{notification.body}</p>
                 {!notification.isRead && (

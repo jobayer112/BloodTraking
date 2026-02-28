@@ -6,12 +6,15 @@ import {
   PlusSquare, 
   MessageSquare, 
   User, 
+  Users,
   Settings,
   Bell,
   Menu,
   X,
   Droplets
 } from 'lucide-react';
+import { db } from '../firebase/config';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../utils/helpers';
@@ -22,18 +25,32 @@ const Navbar = () => {
   const { t, i18n } = useTranslation();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!profile) return;
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', profile.uid),
+      where('isRead', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setUnreadCount(snapshot.size);
+    });
+
+    return () => unsubscribe();
+  }, [profile]);
 
   const navItems = [
     { name: t('home'), path: '/', icon: Home },
     { name: t('find_donor'), path: '/search', icon: Search },
+    { name: t('contact_donors'), path: '/contacts', icon: Users },
     { name: t('requests'), path: '/requests', icon: PlusSquare },
     { name: t('feed'), path: '/feed', icon: MessageSquare },
     { name: t('profile'), path: '/profile', icon: User },
   ];
-
-  if (profile?.role === 'admin') {
-    navItems.push({ name: t('admin'), path: '/admin', icon: Settings });
-  }
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'bn' : 'en';
@@ -42,12 +59,12 @@ const Navbar = () => {
 
   return (
     <nav className="sticky top-0 z-50 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+        <div className="flex justify-between h-14">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
-              <Droplets className="h-8 w-8 text-red-600" />
-              <span className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
+            <Link to="/" className="flex items-center space-x-1.5">
+              <Droplets className="h-6 w-6 text-red-600" />
+              <span className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
                 Blood<span className="text-red-600">Traking</span>
               </span>
             </Link>
@@ -77,7 +94,11 @@ const Navbar = () => {
                 className="p-2 text-zinc-600 dark:text-zinc-400 hover:text-red-600 relative"
               >
                 <Bell className="h-5 w-5" />
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-600 rounded-full border-2 border-white dark:border-zinc-900"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 h-4 w-4 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white dark:border-zinc-900">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </Link>
             )}
 
@@ -90,14 +111,14 @@ const Navbar = () => {
             {profile ? (
               <button
                 onClick={() => signOut()}
-                className="ml-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors"
+                className="ml-2 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-colors"
               >
                 {t('logout')}
               </button>
             ) : (
               <Link
                 to="/login"
-                className="ml-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors"
+                className="ml-2 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-colors"
               >
                 {t('login')}
               </Link>
@@ -112,7 +133,11 @@ const Navbar = () => {
                 className="p-2 text-zinc-600 dark:text-zinc-400 hover:text-red-600 relative"
               >
                 <Bell className="h-6 w-6" />
-                <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-red-600 rounded-full border-2 border-white dark:border-zinc-900"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 h-5 w-5 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white dark:border-zinc-900">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </Link>
             )}
              <button

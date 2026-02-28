@@ -12,7 +12,8 @@ import {
   Ban, 
   CheckCircle,
   BarChart3,
-  Search
+  Search,
+  Lock
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { UserProfile, BloodRequest, Post } from '../types';

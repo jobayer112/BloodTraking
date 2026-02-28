@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
@@ -9,6 +9,7 @@ import Profile from './pages/Profile';
 import SearchDonors from './pages/SearchDonors';
 import BloodRequests from './pages/BloodRequests';
 import SocialFeed from './pages/SocialFeed';
+import ContactDonors from './pages/ContactDonors';
 import AdminDashboard from './pages/AdminDashboard';
 import Notifications from './pages/Notifications';
 import AIChatbot from './components/AIChatbot';
@@ -33,6 +34,7 @@ const AppContent = () => {
           <Route path="/search" element={<SearchDonors />} />
           <Route path="/requests" element={<BloodRequests />} />
           <Route path="/feed" element={<SocialFeed />} />
+          <Route path="/contacts" element={<ContactDonors />} />
           <Route 
             path="/notifications" 
             element={
@@ -62,18 +64,22 @@ const AppContent = () => {
       <Toaster position="bottom-right" />
       <AIChatbot />
       
-      {/* Admin Access Footer */}
       <footer className="bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2 text-zinc-500 text-sm">
-            <Shield className="h-4 w-4" />
-            <span>© 2026 BloodTraking. All rights reserved.</span>
+          <div className="flex flex-col items-center md:items-start gap-1">
+            <div className="flex items-center gap-2 text-zinc-500 text-sm">
+              <Link to="/admin" className="hover:text-red-600 transition-colors">©</Link>
+              <span>2026 BloodTraking. All rights reserved.</span>
+            </div>
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+              Developed By <span className="text-red-600">MD ZOBAER HASAN</span>
+            </p>
           </div>
           <div className="flex items-center gap-6">
-            <a href="/admin" className="flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-red-600 transition-colors">
-              <Lock className="h-3 w-3" />
-              Admin Access
-            </a>
+            <div className="flex items-center gap-2 text-zinc-400 text-[10px] font-medium">
+              <Shield className="h-3 w-3" />
+              <span>Secure Platform</span>
+            </div>
           </div>
         </div>
       </footer>

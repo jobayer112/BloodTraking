@@ -124,6 +124,11 @@ const Home = () => {
               icon: Search
             },
             {
+              title: t('contact_donors'),
+              desc: "Find blood donors directly from your phone's contact list with one click.",
+              icon: Users
+            },
+            {
               title: t('realtime_alerts'),
               desc: t('realtime_alerts_desc'),
               icon: Bell

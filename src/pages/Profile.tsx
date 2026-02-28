@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../firebase/config';
+import { db, storage } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { motion } from 'motion/react';
-import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera } from 'lucide-react';
+import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION } from '../utils/helpers';
+import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn } from '../utils/helpers';
 
 const Profile = () => {
   const { t } = useTranslation();
   const { profile, updateProfileState } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -23,6 +25,7 @@ const Profile = () => {
     height: '',
     isAvailable: true,
     photoURL: '',
+    lastDonationDate: '',
   });
 
   useEffect(() => {
@@ -38,6 +41,7 @@ const Profile = () => {
         height: profile.height || '',
         isAvailable: profile.isAvailable ?? true,
         photoURL: profile.photoURL || '',
+        lastDonationDate: profile.lastDonationDate || '',
       });
     }
   }, [profile]);
@@ -62,21 +66,66 @@ const Profile = () => {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image size should be less than 2MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const storageRef = ref(storage, `profiles/${profile.uid}/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      // Update Firestore immediately
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, { 
+        photoURL: downloadURL,
+        updatedAt: new Date().toISOString()
+      });
+      
+      // Update local state
+      setFormData(prev => ({ ...prev, photoURL: downloadURL }));
+      updateProfileState({ ...profile, photoURL: downloadURL } as any);
+      
+      toast.success('Profile picture updated!');
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (!profile) return null;
 
   const availableDistricts = formData.division ? DISTRICTS_BY_DIVISION[formData.division] : [];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 space-y-8">
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-zinc-900 rounded-3xl shadow-xl overflow-hidden border border-zinc-100 dark:border-zinc-800"
+        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-zinc-100 dark:border-zinc-800"
       >
         {/* Profile Header */}
-        <div className="h-32 bg-red-600 relative">
-          <div className="absolute -bottom-12 left-8">
-            <div className="h-24 w-24 rounded-2xl bg-white dark:bg-zinc-800 p-1 shadow-lg group relative cursor-pointer">
+        <div className="h-24 bg-red-600 relative">
+          <div className="absolute -bottom-10 left-6">
+            <label className={cn(
+              "h-20 w-20 rounded-2xl bg-white dark:bg-zinc-800 p-1 shadow-lg group relative block overflow-hidden",
+              isEditing ? "cursor-pointer" : "cursor-default"
+            )}>
               {formData.photoURL ? (
                 <img src={formData.photoURL} alt={profile.name} className="h-full w-full rounded-xl object-cover" />
               ) : (
@@ -84,32 +133,47 @@ const Profile = () => {
                   <User className="h-12 w-12 text-zinc-400" />
                 </div>
               )}
+              
               {isEditing && (
                 <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera className="h-6 w-6 text-white" />
+                  {uploading ? (
+                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+                  ) : (
+                    <Camera className="h-6 w-6 text-white" />
+                  )}
                 </div>
               )}
-            </div>
+              
+              {isEditing && (
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleImageUpload}
+                  disabled={uploading}
+                />
+              )}
+            </label>
           </div>
         </div>
 
-        <div className="pt-16 pb-8 px-8 space-y-6">
+        <div className="pt-12 pb-6 px-6 space-y-4">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">{profile.name}</h1>
+                <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{profile.name}</h1>
                 {profile.isVerified && (
-                  <div className="flex items-center gap-1 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-900/30">
-                    <CheckCircle className="h-3 w-3 fill-blue-600/10" />
-                    Verified Donor
+                  <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 dark:border-blue-900/30">
+                    <CheckCircle className="h-2.5 w-2.5 fill-blue-600/10" />
+                    Verified
                   </div>
                 )}
               </div>
-              <p className="text-zinc-500 dark:text-zinc-400">{profile.email}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">{profile.email}</p>
             </div>
             <button
               onClick={() => setIsEditing(!isEditing)}
-              className="px-6 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
+              className="px-4 py-1.5 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
             >
               {isEditing ? t('cancel') : t('edit_profile')}
             </button>
@@ -197,6 +261,15 @@ const Profile = () => {
                   className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
                 />
               </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t('last_donation')}</label>
+                <input
+                  type="date"
+                  value={formData.lastDonationDate}
+                  onChange={(e) => setFormData({ ...formData, lastDonationDate: e.target.value })}
+                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
+                />
+              </div>
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Profile Picture URL</label>
                 <input
@@ -227,31 +300,33 @@ const Profile = () => {
               </button>
             </form>
           ) : (
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-2">
-                <Droplets className="h-6 w-6 text-red-600" />
-                <div className="text-sm font-bold text-zinc-500 uppercase">{t('blood_group')}</div>
-                <div className="text-2xl font-bold text-zinc-900 dark:text-white">{profile.bloodGroup || 'Not Set'}</div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
+                <Droplets className="h-5 w-5 text-red-600" />
+                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('blood_group')}</div>
+                <div className="text-lg font-bold text-zinc-900 dark:text-white">{profile.bloodGroup || 'Not Set'}</div>
               </div>
-              <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-2">
-                <MapPin className="h-6 w-6 text-blue-600" />
-                <div className="text-sm font-bold text-zinc-500 uppercase">{t('district')}</div>
-                <div className="text-xl font-bold text-zinc-900 dark:text-white">{profile.district || 'Not Set'}</div>
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
+                <MapPin className="h-5 w-5 text-blue-600" />
+                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('district')}</div>
+                <div className="text-base font-bold text-zinc-900 dark:text-white">{profile.district || 'Not Set'}</div>
               </div>
-              <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-2">
-                <Calendar className="h-6 w-6 text-emerald-600" />
-                <div className="text-sm font-bold text-zinc-500 uppercase">{t('last_donation')}</div>
-                <div className="text-xl font-bold text-zinc-900 dark:text-white">{profile.lastDonationDate || 'Never'}</div>
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
+                <Calendar className="h-5 w-5 text-emerald-600" />
+                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('last_donation')}</div>
+                <div className="text-base font-bold text-zinc-900 dark:text-white">
+                  {profile.donationCount > 0 ? (profile.lastDonationDate || 'Not Set') : 'Never'}
+                </div>
               </div>
-              <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-2">
-                <Scale className="h-6 w-6 text-amber-600" />
-                <div className="text-sm font-bold text-zinc-500 uppercase">{t('weight')}</div>
-                <div className="text-xl font-bold text-zinc-900 dark:text-white">{profile.weight ? `${profile.weight} kg` : 'Not Set'}</div>
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
+                <Scale className="h-5 w-5 text-amber-600" />
+                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('weight')}</div>
+                <div className="text-base font-bold text-zinc-900 dark:text-white">{profile.weight ? `${profile.weight} kg` : 'Not Set'}</div>
               </div>
-              <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-2">
-                <Ruler className="h-6 w-6 text-purple-600" />
-                <div className="text-sm font-bold text-zinc-500 uppercase">{t('height')}</div>
-                <div className="text-xl font-bold text-zinc-900 dark:text-white">{profile.height || 'Not Set'}</div>
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
+                <Ruler className="h-5 w-5 text-purple-600" />
+                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('height')}</div>
+                <div className="text-base font-bold text-zinc-900 dark:text-white">{profile.height || 'Not Set'}</div>
               </div>
             </div>
           )}
@@ -259,36 +334,36 @@ const Profile = () => {
       </motion.div>
 
       {/* Stats & Badges */}
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-100 dark:border-zinc-800 space-y-6">
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <Shield className="h-5 w-5 text-red-600" />
-            Donation Impact
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-4">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <Shield className="h-4 w-4 text-red-600" />
+            Impact
           </h3>
-          <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl">
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-red-600">{profile.donationCount}</div>
-              <div className="text-sm font-medium text-zinc-500">Total Donations</div>
+          <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/10 rounded-xl">
+            <div className="space-y-0.5">
+              <div className="text-xl font-bold text-red-600">{profile.donationCount}</div>
+              <div className="text-[10px] font-medium text-zinc-500">Donations</div>
             </div>
-            <div className="h-12 w-12 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
-              <Heart className="h-6 w-6 text-red-600" />
+            <div className="h-8 w-8 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+              <Heart className="h-4 w-4 text-red-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-100 dark:border-zinc-800 space-y-6">
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <Phone className="h-5 w-5 text-blue-600" />
-            Contact Information
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-4">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <Phone className="h-4 w-4 text-blue-600" />
+            Contact
           </h3>
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Phone className="h-5 w-5 text-zinc-400" />
-              <span className="text-zinc-700 dark:text-zinc-300 font-medium">{profile.phone || 'No phone number added'}</span>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Phone className="h-3.5 w-3.5 text-zinc-400" />
+              <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium truncate">{profile.phone || 'No phone'}</span>
             </div>
-            <div className="flex items-center gap-3">
-              <User className="h-5 w-5 text-zinc-400" />
-              <span className="text-zinc-700 dark:text-zinc-300 font-medium capitalize">{profile.role} Account</span>
+            <div className="flex items-center gap-2">
+              <User className="h-3.5 w-3.5 text-zinc-400" />
+              <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium capitalize truncate">{profile.role}</span>
             </div>
           </div>
         </div>
@@ -298,45 +373,45 @@ const Profile = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-xl overflow-hidden"
+        className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-xl overflow-hidden"
       >
-        <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-red-600" />
-            Donation History
+        <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-red-600" />
+            History
           </h3>
-          <button className="text-sm font-bold text-red-600 hover:underline">Add Record</button>
+          <button className="text-xs font-bold text-red-600 hover:underline">Add Record</button>
         </div>
-        <div className="p-8">
+        <div className="p-4">
           {profile.donationCount > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Simulated history */}
               {[...Array(profile.donationCount)].map((_, i) => (
-                <div key={i} className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 bg-red-100 dark:bg-red-900/20 rounded-xl flex items-center justify-center">
-                      <Droplets className="h-5 w-5 text-red-600" />
+                <div key={i} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
+                      <Droplets className="h-4 w-4 text-red-600" />
                     </div>
                     <div>
-                      <div className="font-bold">Blood Donation</div>
-                      <div className="text-xs text-zinc-500">Hospital General, Dhaka</div>
+                      <div className="font-bold text-xs">Blood Donation</div>
+                      <div className="text-[10px] text-zinc-500">Hospital General</div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-zinc-900 dark:text-white">
+                    <div className="font-bold text-xs text-zinc-900 dark:text-white">
                       {new Date(new Date().getTime() - (i + 1) * 95 * 24 * 60 * 60 * 1000).toLocaleDateString()}
                     </div>
-                    <div className="text-[10px] font-bold text-emerald-600 uppercase">Completed</div>
+                    <div className="text-[9px] font-bold text-emerald-600 uppercase">Done</div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 space-y-4">
-              <div className="h-16 w-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto">
-                <Calendar className="h-8 w-8 text-zinc-300" />
+            <div className="text-center py-8 space-y-2">
+              <div className="h-12 w-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto">
+                <Calendar className="h-6 w-6 text-zinc-300" />
               </div>
-              <p className="text-zinc-500 font-medium">No donation records found.</p>
+              <p className="text-xs text-zinc-500 font-medium">No records found.</p>
             </div>
           )}
         </div>

@@ -72,9 +72,25 @@ const resources = {
       "send_otp": "Send OTP",
       "verify_otp": "Verify OTP",
       "enter_otp": "Enter 6-digit OTP",
+      "contact_donors": "Contact Donors",
+      "sync_contacts": "Sync Contacts",
+      "no_contacts_found": "No donors found in your contacts.",
+      "contacts_permission_denied": "Permission to access contacts was denied.",
+      "contacts_not_supported": "Contact matching is not supported on this device.",
+      "location_permission_required": "Location permission is required to show nearby donors.",
+      "finding_contacts": "Finding donors from your contacts...",
+      "donor_details": "Donor Details",
+      "share_contact": "Share Contact",
+      "close": "Close",
+      "call": "Call",
+      "share_text": "Blood Donor Contact:\nName: {{name}}\nBlood Group: {{group}}\nPhone: {{phone}}\nLocation: {{location}}",
       "otp_sent": "OTP sent to your phone!",
       "change_phone": "Change Phone Number",
-      "processing": "Processing..."
+      "processing": "Processing...",
+      "comments": "Comments",
+      "write_comment": "Write a comment...",
+      "no_comments": "No comments yet.",
+      "reply": "Reply"
     }
   },
   bn: {
@@ -146,9 +162,25 @@ const resources = {
       "send_otp": "ওটিপি পাঠান",
       "verify_otp": "ওটিপি যাচাই করুন",
       "enter_otp": "৬ ডিজিটের ওটিপি দিন",
+      "contact_donors": "কন্টাক্ট দাতা",
+      "sync_contacts": "কন্টাক্ট সিঙ্ক করুন",
+      "no_contacts_found": "আপনার কন্টাক্টে কোনো দাতা পাওয়া যায়নি।",
+      "contacts_permission_denied": "কন্টাক্ট অ্যাক্সেস করার অনুমতি প্রত্যাখ্যান করা হয়েছে।",
+      "contacts_not_supported": "এই ডিভাইসে কন্টাক্ট ম্যাচিং সমর্থিত নয়।",
+      "location_permission_required": "কাছাকাছি দাতাদের দেখানোর জন্য লোকেশন পারমিশন প্রয়োজন।",
+      "finding_contacts": "আপনার কন্টাক্ট থেকে দাতা খোঁজা হচ্ছে...",
+      "donor_details": "দাতার তথ্য",
+      "share_contact": "কন্টাক্ট শেয়ার করুন",
+      "close": "বন্ধ করুন",
+      "call": "কল করুন",
+      "share_text": "রক্তদাতার কন্টাক্ট:\nনাম: {{name}}\nরক্তের গ্রুপ: {{group}}\nফোন: {{phone}}\nঅবস্থান: {{location}}",
       "otp_sent": "আপনার ফোনে ওটিপি পাঠানো হয়েছে!",
       "change_phone": "ফোন নম্বর পরিবর্তন করুন",
-      "processing": "প্রক্রিয়াকরণ হচ্ছে..."
+      "processing": "প্রক্রিয়াকরণ হচ্ছে...",
+      "comments": "মন্তব্য",
+      "write_comment": "একটি মন্তব্য লিখুন...",
+      "no_comments": "এখনও কোনো মন্তব্য নেই।",
+      "reply": "উত্তর দিন"
     }
   }
 };

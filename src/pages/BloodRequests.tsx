@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, where, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, MapPin, Droplets, Calendar, Phone, AlertCircle, Clock, CheckCircle2, X } from 'lucide-react';
+import { Plus, MapPin, Droplets, Calendar, Phone, AlertCircle, Clock, CheckCircle2, X, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn } from '../utils/helpers';
 import { BloodRequest } from '../types';
+import { notifyMatchingDonors, createNotification } from '../utils/notifications';
 
 const BloodRequests = () => {
   const { t } = useTranslation();
@@ -48,15 +49,40 @@ const BloodRequests = () => {
     }
 
     try {
-      await addDoc(collection(db, 'bloodRequests'), {
+      const docRef = await addDoc(collection(db, 'bloodRequests'), {
         ...newRequest,
         requesterId: profile.uid,
         requesterName: profile.name,
         status: 'open',
         createdAt: new Date().toISOString()
       });
+
+      // Notify matching donors
+      await notifyMatchingDonors(newRequest.bloodGroup, newRequest.district, docRef.id);
+
       toast.success('Blood request created successfully!');
       setShowModal(false);
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleFulfill = async (requestId: string) => {
+    try {
+      await updateDoc(doc(db, 'bloodRequests', requestId), {
+        status: 'fulfilled'
+      });
+      toast.success('Request marked as fulfilled!');
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleDelete = async (requestId: string) => {
+    if (!window.confirm('Are you sure you want to delete this request?')) return;
+    try {
+      await deleteDoc(doc(db, 'bloodRequests', requestId));
+      toast.success('Request deleted successfully');
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -65,17 +91,17 @@ const BloodRequests = () => {
   const availableDistricts = newRequest.division ? DISTRICTS_BY_DIVISION[newRequest.division] : [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="space-y-1 text-center md:text-left">
-          <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-white">{t('requests')}</h1>
-          <p className="text-zinc-500 dark:text-zinc-400">View and respond to urgent blood needs in your community.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">{t('requests')}</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">View and respond to urgent blood needs in your community.</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="w-full md:w-auto px-8 py-4 bg-red-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 transition-all shadow-lg shadow-red-600/20"
+          className="w-full md:w-auto px-6 py-3 bg-red-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 text-sm"
         >
-          <Plus className="h-5 w-5" />
+          <Plus className="h-4 w-4" />
           {t('request_blood')}
         </button>
       </div>
@@ -98,16 +124,16 @@ const BloodRequests = () => {
               )}
             >
               <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <div className={cn(
-                    "h-12 w-12 rounded-2xl flex items-center justify-center font-bold text-xl",
+                    "h-10 w-10 rounded-xl flex items-center justify-center font-bold text-lg",
                     request.emergencyLevel === 'critical' ? "bg-red-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-red-600"
                   )}>
                     {request.bloodGroup}
                   </div>
                   <div>
-                    <h3 className="font-bold text-zinc-900 dark:text-white">{request.requesterName}</h3>
-                    <div className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider">
+                    <h3 className="font-bold text-sm text-zinc-900 dark:text-white">{request.requesterName}</h3>
+                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider">
                       {request.emergencyLevel === 'critical' ? (
                         <span className="text-red-600 flex items-center gap-1">
                           <AlertCircle className="h-3 w-3" /> Critical
@@ -130,13 +156,13 @@ const BloodRequests = () => {
                 </div>
               </div>
 
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
-                  <MapPin className="h-4 w-4 text-zinc-400" />
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                  <MapPin className="h-3.5 w-3.5 text-zinc-400" />
                   <span>{request.hospitalName}, {request.district}</span>
                 </div>
-                <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
-                  <Calendar className="h-4 w-4 text-zinc-400" />
+                <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                  <Calendar className="h-3.5 w-3.5 text-zinc-400" />
                   <span>Needed by: {new Date(request.requiredDate).toLocaleDateString()}</span>
                 </div>
               </div>
@@ -147,15 +173,43 @@ const BloodRequests = () => {
                 </p>
               )}
 
-              <div className="flex gap-2 pt-2">
-                <a
-                  href={`tel:${request.contactPhone}`}
-                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold text-center hover:bg-red-700 transition-all flex items-center justify-center gap-2"
-                >
-                  <Phone className="h-4 w-4" />
-                  Call Now
-                </a>
-                <button className="px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all">
+              <div className="flex gap-2 pt-1">
+                {request.status === 'open' ? (
+                  <>
+                    <a
+                      href={`tel:${request.contactPhone}`}
+                      className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold text-xs text-center hover:bg-red-700 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Phone className="h-3.5 w-3.5" />
+                      Call Now
+                    </a>
+                    {(profile?.uid === request.requesterId || profile?.role === 'admin') && (
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleFulfill(request.id)}
+                          className="px-3 py-2.5 bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 transition-all font-bold text-xs flex items-center gap-1.5"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Fulfill
+                        </button>
+                        {profile?.role === 'admin' && (
+                          <button
+                            onClick={() => handleDelete(request.id)}
+                            className="px-3 py-2.5 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-all font-bold text-xs flex items-center gap-1.5"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl font-bold text-xs text-center flex items-center justify-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    Request Fulfilled
+                  </div>
+                )}
+                <button className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all text-xs">
                   Share
                 </button>
               </div>

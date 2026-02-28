@@ -54,6 +54,7 @@ export interface Post {
   createdAt: string;
   mediaURL?: string;
   mediaType?: 'image' | 'video';
+  phone?: string;
 }
 
 export interface Comment {
@@ -64,6 +65,7 @@ export interface Comment {
   authorPhoto?: string;
   content: string;
   createdAt: string;
+  parentId?: string;
 }
 
 export interface Notification {

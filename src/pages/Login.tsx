@@ -100,13 +100,14 @@ const Login = () => {
         const user = userCredential.user;
         
         // Create initial profile
+        const isAdmin = email === 'zobaerhasan431@gmail.com';
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           email: user.email,
           name: email.split('@')[0],
-          role: 'donor',
+          role: isAdmin ? 'admin' : 'donor',
           isAvailable: true,
-          isVerified: false,
+          isVerified: isAdmin,
           donationCount: 0,
           lastDonationDate: null,
           createdAt: new Date().toISOString(),
