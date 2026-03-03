@@ -13,7 +13,8 @@ import {
   CheckCircle,
   BarChart3,
   Search,
-  Lock
+  Lock,
+  Home
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { UserProfile, BloodRequest, Post } from '../types';
@@ -75,6 +76,38 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleBan = async (userId: string, currentBannedStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        isBanned: !currentBannedStatus
+      });
+      toast.success(currentBannedStatus ? 'User unbanned' : 'User banned');
+    } catch (error) {
+      toast.error('Failed to update user');
+    }
+  };
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        role: newRole
+      });
+      toast.success('User role updated');
+    } catch (error) {
+      toast.error('Failed to update role');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm('Are you sure you want to delete this user? This action is irreversible.')) return;
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      toast.success('User deleted');
+    } catch (error) {
+      toast.error('Failed to delete user');
+    }
+  };
+
   const handleDeletePost = async (postId: string) => {
     if (!window.confirm('Are you sure you want to delete this post?')) return;
     try {
@@ -96,16 +129,25 @@ const AdminDashboard = () => {
             <h2 className="text-2xl font-bold">Admin Access Required</h2>
             <p className="text-zinc-500">This area is restricted to administrators only. Please log in with an authorized administrator account.</p>
           </div>
-          <button 
-            onClick={() => {
-              auth.signOut();
-              window.location.href = '/login';
-            }}
-            className="w-full py-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2"
-          >
-            <Lock className="h-4 w-4" />
-            Login as Admin
-          </button>
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={() => window.location.href = '/'}
+              className="w-full py-4 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+            >
+              <Home className="h-4 w-4" />
+              Back to Home
+            </button>
+            <button 
+              onClick={() => {
+                auth.signOut();
+                window.location.href = '/login';
+              }}
+              className="w-full py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-xl font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+            >
+              <Lock className="h-4 w-4" />
+              Login as Admin
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -165,6 +207,7 @@ const AdminDashboard = () => {
             <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-xs font-bold text-zinc-500 uppercase tracking-wider">
               <tr>
                 <th className="px-6 py-4">User</th>
+                <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4">Blood Group</th>
                 <th className="px-6 py-4">District</th>
                 <th className="px-6 py-4">Status</th>
@@ -174,6 +217,17 @@ const AdminDashboard = () => {
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {users.map((user) => (
                 <tr key={user.uid} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td className="px-6 py-4">
+                    <select 
+                      value={user.role}
+                      onChange={(e) => handleRoleChange(user.uid, e.target.value)}
+                      className="bg-zinc-50 dark:bg-zinc-800 border-none rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-red-600 px-2 py-1"
+                    >
+                      <option value="donor">Donor</option>
+                      <option value="receiver">Receiver</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
@@ -202,6 +256,11 @@ const AdminDashboard = () => {
                       ) : (
                         <span className="text-xs font-bold text-zinc-400">Unverified</span>
                       )}
+                      {user.isBanned && (
+                        <span className="flex items-center gap-1 text-xs font-bold text-red-600">
+                          <Ban className="h-3 w-3" /> Banned
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -224,12 +283,17 @@ const AdminDashboard = () => {
                         </button>
                       )}
                       <button 
-                        className="p-2 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600 rounded-lg transition-colors"
-                        title="Ban User"
+                        onClick={() => handleBan(user.uid, !!user.isBanned)}
+                        className={cn(
+                          "p-2 rounded-lg transition-colors",
+                          user.isBanned ? "bg-red-600 text-white" : "hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600"
+                        )}
+                        title={user.isBanned ? "Unban User" : "Ban User"}
                       >
                         <Ban className="h-5 w-5" />
                       </button>
                       <button 
+                        onClick={() => handleDeleteUser(user.uid)}
                         className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 rounded-lg transition-colors"
                         title="Delete User"
                       >

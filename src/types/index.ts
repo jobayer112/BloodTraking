@@ -18,7 +18,10 @@ export interface UserProfile {
   donationCount: number;
   isAvailable: boolean;
   isVerified: boolean;
+  isBanned?: boolean;
   role: UserRole;
+  medicalHistory?: string;
+  donationPreferences?: string;
   fcmToken?: string;
   createdAt: string;
   updatedAt: string;

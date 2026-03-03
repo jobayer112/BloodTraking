@@ -7,17 +7,21 @@ import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn } from '../utils/hel
 import { UserProfile } from '../types';
 import DonorMap from '../components/DonorMap';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 const SearchDonors = () => {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
   const [donors, setDonors] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
   const [filters, setFilters] = useState({
-    bloodGroup: '',
+    bloodGroup: searchParams.get('group') || '',
     division: '',
-    district: '',
+    district: searchParams.get('district') || '',
+    availability: 'all', // 'all', 'available', 'unavailable'
+    donationStatus: 'all', // 'all', 'ready' (4+ months since last donation)
   });
   const [selectedDonor, setSelectedDonor] = useState<UserProfile | null>(null);
 
@@ -41,7 +45,24 @@ const SearchDonors = () => {
       }
 
       const querySnapshot = await getDocs(q);
-      const donorList = querySnapshot.docs.map(doc => doc.data() as UserProfile);
+      let donorList = querySnapshot.docs.map(doc => doc.data() as UserProfile);
+
+      // In-memory filtering for more complex criteria
+      if (filters.availability === 'available') {
+        donorList = donorList.filter(d => d.isAvailable);
+      } else if (filters.availability === 'unavailable') {
+        donorList = donorList.filter(d => !d.isAvailable);
+      }
+
+      if (filters.donationStatus === 'ready') {
+        const fourMonthsAgo = new Date();
+        fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 4);
+        donorList = donorList.filter(d => {
+          if (!d.lastDonationDate) return true;
+          return new Date(d.lastDonationDate) <= fourMonthsAgo;
+        });
+      }
+
       setDonors(donorList);
     } catch (error) {
       console.error("Error fetching donors:", error);
@@ -128,6 +149,29 @@ const SearchDonors = () => {
             >
               <option value="">All</option>
               {availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Availability</label>
+            <select
+              value={filters.availability}
+              onChange={(e) => setFilters({ ...filters, availability: e.target.value })}
+              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+            >
+              <option value="all">All</option>
+              <option value="available">Available Only</option>
+              <option value="unavailable">Unavailable</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Donation Status</label>
+            <select
+              value={filters.donationStatus}
+              onChange={(e) => setFilters({ ...filters, donationStatus: e.target.value })}
+              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+            >
+              <option value="all">Any Time</option>
+              <option value="ready">Ready to Donate (4+ months)</option>
             </select>
           </div>
           <button
@@ -341,7 +385,24 @@ const SearchDonors = () => {
                     </div>
                   </div>
                 </div>
-
+                
+                {(selectedDonor.medicalHistory || selectedDonor.donationPreferences) && (
+                  <div className="space-y-4">
+                    {selectedDonor.medicalHistory && (
+                      <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/20">
+                        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">Medical History</p>
+                        <p className="text-sm text-zinc-700 dark:text-zinc-300">{selectedDonor.medicalHistory}</p>
+                      </div>
+                    )}
+                    {selectedDonor.donationPreferences && (
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20">
+                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Donation Preferences</p>
+                        <p className="text-sm text-zinc-700 dark:text-zinc-300">{selectedDonor.donationPreferences}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <div className="flex gap-3 pt-4">
                   <a
                     href={`tel:${selectedDonor.phone}`}

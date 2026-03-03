@@ -100,7 +100,7 @@ const Login = () => {
         const user = userCredential.user;
         
         // Create initial profile
-        const isAdmin = email === 'zobaerhasan431@gmail.com';
+        const isAdmin = email === 'zobaerhasan431@gmail.com' || user.uid === 'cWfThoHPOKdviqdkegbyAkDKLjA3';
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           email: user.email,
@@ -127,6 +127,8 @@ const Login = () => {
     try {
       await signInWithGoogle();
       toast.success('Logged in with Google');
+      
+      // The AuthContext will handle the profile creation/update and admin role assignment
       navigate('/');
     } catch (error: any) {
       toast.error(error.message);

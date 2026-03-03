@@ -26,6 +26,8 @@ const Profile = () => {
     isAvailable: true,
     photoURL: '',
     lastDonationDate: '',
+    medicalHistory: '',
+    donationPreferences: '',
   });
 
   useEffect(() => {
@@ -42,6 +44,8 @@ const Profile = () => {
         isAvailable: profile.isAvailable ?? true,
         photoURL: profile.photoURL || '',
         lastDonationDate: profile.lastDonationDate || '',
+        medicalHistory: profile.medicalHistory || '',
+        donationPreferences: profile.donationPreferences || '',
       });
     }
   }, [profile]);
@@ -49,6 +53,13 @@ const Profile = () => {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
+    
+    // Phone validation
+    const phoneRegex = /^(?:\+88|01)?\d{11}$/;
+    if (formData.phone && !phoneRegex.test(formData.phone)) {
+      toast.error('Please enter a valid Bangladeshi phone number');
+      return;
+    }
 
     try {
       const userRef = doc(db, 'users', profile.uid);
@@ -268,6 +279,26 @@ const Profile = () => {
                   value={formData.lastDonationDate}
                   onChange={(e) => setFormData({ ...formData, lastDonationDate: e.target.value })}
                   className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Medical History</label>
+                <textarea
+                  value={formData.medicalHistory}
+                  onChange={(e) => setFormData({ ...formData, medicalHistory: e.target.value })}
+                  placeholder="Any chronic conditions, allergies, or recent surgeries..."
+                  rows={3}
+                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 resize-none"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Donation Preferences</label>
+                <textarea
+                  value={formData.donationPreferences}
+                  onChange={(e) => setFormData({ ...formData, donationPreferences: e.target.value })}
+                  placeholder="Preferred donation times, locations, or other preferences..."
+                  rows={3}
+                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 resize-none"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">

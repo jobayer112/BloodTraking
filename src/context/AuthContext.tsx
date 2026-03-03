@@ -5,7 +5,7 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase/config';
 import { UserProfile } from '../types';
 
@@ -35,17 +35,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
-          setProfile(docSnap.data() as UserProfile);
+          const data = docSnap.data() as UserProfile;
+          // Force admin role for the specific email or UID
+          const isAdmin = firebaseUser.email === 'zobaerhasan431@gmail.com' || firebaseUser.uid === 'cWfThoHPOKdviqdkegbyAkDKLjA3';
+          if (isAdmin && data.role !== 'admin') {
+            data.role = 'admin';
+            data.isVerified = true;
+            await updateDoc(docRef, { role: 'admin', isVerified: true });
+          }
+
+          if (data.isBanned) {
+            await firebaseSignOut(auth);
+            setProfile(null);
+            setUser(null);
+            return;
+          }
+
+          setProfile(data);
         } else {
           // Create a default profile if it doesn't exist (e.g., first time Google login)
+          const isAdmin = firebaseUser.email === 'zobaerhasan431@gmail.com' || firebaseUser.uid === 'cWfThoHPOKdviqdkegbyAkDKLjA3';
           const newProfile: Partial<UserProfile> = {
             uid: firebaseUser.uid,
             name: firebaseUser.displayName || 'Anonymous',
             email: firebaseUser.email || '',
             photoURL: firebaseUser.photoURL || '',
-            role: firebaseUser.email === 'zobaerhasan431@gmail.com' ? 'admin' : 'donor',
+            role: isAdmin ? 'admin' : 'donor',
             isAvailable: true,
-            isVerified: firebaseUser.email === 'zobaerhasan431@gmail.com',
+            isVerified: isAdmin,
             donationCount: 0,
             lastDonationDate: null,
             createdAt: new Date().toISOString(),

@@ -3,9 +3,10 @@ import { db } from '../firebase/config';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, where, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, MapPin, Droplets, Calendar, Phone, AlertCircle, Clock, CheckCircle2, X, Trash2 } from 'lucide-react';
+import { Plus, MapPin, Droplets, Calendar, Phone, AlertCircle, Clock, CheckCircle2, X, Trash2, Search, Share2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn } from '../utils/helpers';
 import { BloodRequest } from '../types';
 import { notifyMatchingDonors, createNotification } from '../utils/notifications';
@@ -13,9 +14,11 @@ import { notifyMatchingDonors, createNotification } from '../utils/notifications
 const BloodRequests = () => {
   const { t } = useTranslation();
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [requests, setRequests] = useState<BloodRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [newRequest, setNewRequest] = useState({
     bloodGroup: '',
     emergencyLevel: 'normal',
@@ -88,6 +91,45 @@ const BloodRequests = () => {
     }
   };
 
+  const filteredRequests = filterOpen 
+    ? requests.filter(r => r.status === 'open')
+    : requests;
+
+  const handleShare = async (request: BloodRequest) => {
+    const shareText = `Emergency Blood Request!\nGroup: ${request.bloodGroup}\nHospital: ${request.hospitalName}\nDistrict: ${request.district}\nDate: ${new Date(request.requiredDate).toLocaleDateString()}\nContact: ${request.contactPhone}\nNote: ${request.note || 'N/A'}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Blood Request',
+          text: shareText,
+          url: window.location.href
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareText);
+        toast.success('Request details copied to clipboard');
+      } catch (error) {
+        toast.error('Failed to copy');
+      }
+    }
+  };
+
+  const addToCalendar = (request: BloodRequest) => {
+    const date = new Date(request.requiredDate).toISOString().replace(/-|:|\.\d+/g, '');
+    const title = encodeURIComponent(`Blood Donation: ${request.bloodGroup}`);
+    const details = encodeURIComponent(`Hospital: ${request.hospitalName}\nContact: ${request.contactPhone}`);
+    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}/${date}&details=${details}`;
+    window.open(url, '_blank');
+  };
+
+  const findMatches = (request: BloodRequest) => {
+    navigate(`/donors?group=${encodeURIComponent(request.bloodGroup)}&district=${encodeURIComponent(request.district)}`);
+  };
+
   const availableDistricts = newRequest.division ? DISTRICTS_BY_DIVISION[newRequest.division] : [];
 
   return (
@@ -97,13 +139,26 @@ const BloodRequests = () => {
           <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">{t('requests')}</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">View and respond to urgent blood needs in your community.</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="w-full md:w-auto px-6 py-3 bg-red-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 text-sm"
-        >
-          <Plus className="h-4 w-4" />
-          {t('request_blood')}
-        </button>
+        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+          <button
+            onClick={() => setFilterOpen(!filterOpen)}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-bold transition-all border",
+              filterOpen 
+                ? "bg-red-50 border-red-200 text-red-600" 
+                : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500"
+            )}
+          >
+            {filterOpen ? 'Showing Open Only' : 'Show All Requests'}
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="w-full md:w-auto px-6 py-3 bg-red-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 text-sm"
+          >
+            <Plus className="h-4 w-4" />
+            {t('request_blood')}
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -112,7 +167,7 @@ const BloodRequests = () => {
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {requests.map((request, index) => (
+          {filteredRequests.map((request, index) => (
             <motion.div
               key={request.id}
               initial={{ opacity: 0, scale: 0.95 }}
@@ -163,7 +218,15 @@ const BloodRequests = () => {
                 </div>
                 <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
                   <Calendar className="h-3.5 w-3.5 text-zinc-400" />
-                  <span>Needed by: {new Date(request.requiredDate).toLocaleDateString()}</span>
+                  <div className="flex items-center justify-between w-full">
+                    <span>Needed by: {new Date(request.requiredDate).toLocaleDateString()}</span>
+                    <button 
+                      onClick={() => addToCalendar(request)}
+                      className="text-[10px] text-red-600 font-bold hover:underline"
+                    >
+                      + Calendar
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -209,9 +272,22 @@ const BloodRequests = () => {
                     Request Fulfilled
                   </div>
                 )}
-                <button className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all text-xs">
+                <button 
+                  onClick={() => handleShare(request)}
+                  className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all text-xs flex items-center gap-1.5"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
                   Share
                 </button>
+                {request.status === 'open' && (
+                  <button 
+                    onClick={() => findMatches(request)}
+                    className="px-3 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-xs flex items-center gap-1.5 font-bold"
+                  >
+                    <Search className="h-3.5 w-3.5" />
+                    Find Donors
+                  </button>
+                )}
               </div>
             </motion.div>
           ))}

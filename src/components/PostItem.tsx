@@ -122,6 +122,29 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile }) => {
     }
   };
 
+  const handleShare = async () => {
+    const shareText = `Check out this post on BloodTraking!\n\n${post.content}\n\nBy: ${post.authorName}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'BloodTraking Post',
+          text: shareText,
+          url: window.location.href
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareText);
+        toast.success('Post details copied to clipboard');
+      } catch (error) {
+        toast.error('Failed to copy');
+      }
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -207,7 +230,10 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile }) => {
             <MessageSquare className="h-4 w-4" />
             {post.commentCount}
           </button>
-          <button className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-emerald-600 font-bold transition-colors">
+          <button 
+            onClick={handleShare}
+            className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-emerald-600 font-bold transition-colors"
+          >
             <Share2 className="h-4 w-4" />
             Share
           </button>
