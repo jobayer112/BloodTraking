@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, Phone, MapPin, CheckCircle, Search, RefreshCw, Navigation } from 'lucide-react';
+import { Users, Phone, MapPin, CheckCircle, Search, RefreshCw, Navigation, Share2, MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { UserProfile } from '../types';
-import { cn } from '../utils/helpers';
+import { cn, canDonate } from '../utils/helpers';
 import { toast } from 'react-hot-toast';
 
 const ContactDonors = () => {
   const { t } = useTranslation();
   const { profile } = useAuth();
   const [matchedDonors, setMatchedDonors] = useState<UserProfile[]>([]);
+  const [unregisteredContacts, setUnregisteredContacts] = useState<{name: string, phone: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -66,12 +67,20 @@ const ContactDonors = () => {
       setLoading(true);
       
       // Extract phone numbers and normalize them
-      const phoneNumbers = contacts.flatMap((c: any) => 
-        c.tel.map((t: string) => {
-          const digits = t.replace(/\D/g, '');
-          return digits.length >= 11 ? digits.slice(-11) : digits;
-        })
-      ).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i && v.length > 0);
+      const contactMap = new Map<string, string>();
+      contacts.forEach((c: any) => {
+        if (c.tel && c.tel.length > 0) {
+          c.tel.forEach((t: string) => {
+            const digits = t.replace(/\D/g, '');
+            const normalized = digits.length >= 11 ? digits.slice(-11) : digits;
+            if (normalized) {
+              contactMap.set(normalized, c.name?.[0] || 'Unknown Contact');
+            }
+          });
+        }
+      });
+
+      const phoneNumbers = Array.from(contactMap.keys());
 
       if (phoneNumbers.length === 0) {
         setLoading(false);
@@ -91,21 +100,37 @@ const ContactDonors = () => {
       }
 
       setMatchedDonors([]); // Reset list for new sync
+      setUnregisteredContacts([]);
 
       for (const chunk of chunks) {
         const q = query(
           collection(db, 'users'),
           where('phone', 'in', chunk),
-          where('role', '==', 'donor'),
-          where('isAvailable', '==', true)
+          where('role', '==', 'donor')
         );
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
-          const matches = snapshot.docs.map(doc => doc.data() as UserProfile);
+          const matches = snapshot.docs
+            .map(doc => doc.data() as UserProfile)
+            .filter(donor => canDonate(donor.lastDonationDate));
+          
           setMatchedDonors(prev => {
             // Remove old versions of these users and add new ones
             const otherDonors = prev.filter(p => !chunk.includes(p.phone));
             return [...otherDonors, ...matches];
+          });
+
+          setUnregisteredContacts(prev => {
+            const matchedPhones = snapshot.docs.map(doc => doc.data().phone);
+            const unmatchedInChunk = chunk.filter(p => !matchedPhones.includes(p));
+            
+            const newUnregistered = unmatchedInChunk.map(phone => ({
+              name: contactMap.get(phone) || 'Unknown Contact',
+              phone
+            }));
+
+            const otherUnregistered = prev.filter(p => !chunk.includes(p.phone));
+            return [...otherUnregistered, ...newUnregistered];
           });
         });
         newUnsubs.push(unsubscribe);
@@ -125,6 +150,48 @@ const ContactDonors = () => {
     }
   };
 
+  const handleInvite = async (phone?: string) => {
+    const inviteText = `Join BloodBond and become a lifesaver! Register as a blood donor today.`;
+    const inviteUrl = window.location.origin;
+
+    if (phone) {
+      // Invite specific contact via SMS or WhatsApp
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+        // Try to open WhatsApp first, fallback to SMS
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(inviteText + ' ' + inviteUrl)}`, '_blank');
+      } else {
+        window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(inviteText + ' ' + inviteUrl)}`, '_blank');
+      }
+      return;
+    }
+
+    // General invite using Web Share API
+    const shareData = {
+      title: 'BloodBond - Save Lives',
+      text: inviteText,
+      url: inviteUrl,
+    };
+
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+        toast.success('Thanks for sharing!');
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          toast.error('Failed to share.');
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
+        toast.success('Invite link copied to clipboard!');
+      } catch (err) {
+        toast.error('Failed to copy link.');
+      }
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-12 space-y-8">
       <div className="text-center space-y-4">
@@ -138,21 +205,31 @@ const ContactDonors = () => {
       </div>
 
       <div className="flex flex-col items-center gap-6">
-        {!isSupported ? (
-          <div className="w-full p-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 rounded-3xl text-center space-y-2">
-            <p className="text-amber-700 dark:text-amber-400 font-medium">{t('contacts_not_supported')}</p>
-            <p className="text-sm text-amber-600/70">Try using a mobile browser like Chrome on Android for this feature.</p>
-          </div>
-        ) : (
+        <div className="flex flex-wrap justify-center gap-4">
+          {!isSupported ? (
+            <div className="w-full p-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 rounded-3xl text-center space-y-2">
+              <p className="text-amber-700 dark:text-amber-400 font-medium">{t('contacts_not_supported')}</p>
+              <p className="text-sm text-amber-600/70">Try using a mobile browser like Chrome on Android for this feature.</p>
+            </div>
+          ) : (
+            <button
+              onClick={syncContacts}
+              disabled={loading}
+              className="px-8 py-4 bg-red-600 text-white rounded-2xl font-bold flex items-center gap-3 hover:bg-red-700 transition-all shadow-xl shadow-red-600/20 disabled:opacity-50"
+            >
+              {loading ? <RefreshCw className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
+              {t('sync_contacts')}
+            </button>
+          )}
+
           <button
-            onClick={syncContacts}
-            disabled={loading}
-            className="px-8 py-4 bg-red-600 text-white rounded-2xl font-bold flex items-center gap-3 hover:bg-red-700 transition-all shadow-xl shadow-red-600/20 disabled:opacity-50"
+            onClick={() => handleInvite()}
+            className="px-8 py-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl font-bold flex items-center gap-3 hover:opacity-90 transition-all shadow-xl shadow-zinc-900/20 dark:shadow-white/20"
           >
-            {loading ? <RefreshCw className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
-            {t('sync_contacts')}
+            <Share2 className="h-5 w-5" />
+            Invite Friends
           </button>
-        )}
+        </div>
 
         {userLocation && (
           <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-2 rounded-full border border-emerald-100 dark:border-emerald-900/30">
@@ -188,7 +265,13 @@ const ContactDonors = () => {
                     </div>
                     <div>
                       <div className="flex items-center gap-1">
-                        <h3 className="font-bold text-zinc-900 dark:text-white">{donor.name}</h3>
+                        <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                          {donor.name}
+                          <div className={cn(
+                            "h-2 w-2 rounded-full shadow-sm",
+                            canDonate(donor.lastDonationDate) ? "bg-emerald-500" : "bg-red-500"
+                          )} />
+                        </h3>
                         {donor.isVerified && <CheckCircle className="h-3 w-3 text-blue-500 fill-current" />}
                       </div>
                       <p className="text-sm text-zinc-500 flex items-center gap-1">
@@ -226,6 +309,45 @@ const ContactDonors = () => {
               <p className="text-zinc-500 font-medium">{t('no_contacts_found')}</p>
             </div>
           )
+        )}
+
+        {!loading && unregisteredContacts.length > 0 && (
+          <div className="mt-12 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Invite to BloodBond</h2>
+              <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full text-sm font-medium">
+                {unregisteredContacts.length} Contacts
+              </span>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              {unregisteredContacts.map((contact, index) => (
+                <motion.div
+                  key={`${contact.phone}-${index}`}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                      <Users className="h-5 w-5 text-zinc-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-zinc-900 dark:text-white text-sm">{contact.name}</h3>
+                      <p className="text-xs text-zinc-500">{contact.phone}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleInvite(contact.phone)}
+                    className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    Invite
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

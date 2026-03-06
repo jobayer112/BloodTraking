@@ -48,7 +48,7 @@ const Navbar = () => {
     { name: t('find_donor'), path: '/search', icon: Search },
     { name: t('contact_donors'), path: '/contacts', icon: Users },
     { name: t('requests'), path: '/requests', icon: PlusSquare },
-    { name: t('feed'), path: '/feed', icon: MessageSquare },
+    { name: 'Community', path: '/feed', icon: MessageSquare },
     { name: t('profile'), path: '/profile', icon: User },
   ];
 

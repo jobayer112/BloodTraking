@@ -1,5 +1,5 @@
 export type BloodGroup = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
-export type UserRole = 'donor' | 'receiver' | 'admin';
+export type UserRole = 'donor' | 'receiver' | 'admin' | 'moderator';
 export type EmergencyLevel = 'normal' | 'urgent' | 'critical';
 export type RequestStatus = 'open' | 'fulfilled' | 'cancelled';
 
@@ -16,7 +16,6 @@ export interface UserProfile {
   height?: string;
   lastDonationDate: string | null;
   donationCount: number;
-  isAvailable: boolean;
   isVerified: boolean;
   isBanned?: boolean;
   role: UserRole;
@@ -52,6 +51,9 @@ export interface Post {
   authorPhoto?: string;
   content: string;
   type: 'general' | 'emergency';
+  bloodGroup?: BloodGroup;
+  hashtags?: string[];
+  isReported?: boolean;
   likes: string[]; // Array of user UIDs
   commentCount: number;
   createdAt: string;

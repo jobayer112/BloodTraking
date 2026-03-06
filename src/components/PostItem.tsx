@@ -2,19 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, arrayUnion, arrayRemove, increment, where, deleteDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquare, Heart, Share2, Send, User, MoreVertical, Play, X, Trash2, Phone, Reply } from 'lucide-react';
+import { MessageSquare, Heart, Share2, Send, User, MoreVertical, Play, X, Trash2, Phone, Reply, Edit2, AlertTriangle, Image as ImageIcon, Video, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { Post, Comment, UserProfile } from '../types';
+import { Post, Comment, UserProfile, BloodGroup } from '../types';
 import { cn } from '../utils/helpers';
 import { createNotification } from '../utils/notifications';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase/config';
 
 interface PostItemProps {
   post: Post;
   profile: UserProfile | null;
+  onHashtagClick?: (tag: string) => void;
 }
 
-const PostItem: React.FC<PostItemProps> = ({ post, profile }) => {
+const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) => {
   const { t } = useTranslation();
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -22,6 +25,18 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile }) => {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const isLiked = profile ? post.likes.includes(profile.uid) : false;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content);
+  const [editPhone, setEditPhone] = useState(post.phone || '');
+  const [editMediaURL, setEditMediaURL] = useState(post.mediaURL || '');
+  const [editMediaType, setEditMediaType] = useState(post.mediaType || null);
+  const [editPostType, setEditPostType] = useState(post.type);
+  const [editBloodGroup, setEditBloodGroup] = useState(post.bloodGroup || '');
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const bloodGroups: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
   useEffect(() => {
     if (!showComments) return;
@@ -145,6 +160,87 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile }) => {
     }
   };
 
+  const handleReport = async () => {
+    if (!profile) return toast.error('Please login to report posts');
+    if (!window.confirm('Are you sure you want to report this post?')) return;
+
+    try {
+      await updateDoc(doc(db, 'posts', post.id), {
+        isReported: true
+      });
+      toast.success('Post reported successfully');
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleEditFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    setIsUploading(true);
+    try {
+      const storageRef = ref(storage, `posts/${profile.uid}/${Date.now()}_${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      
+      setEditMediaURL(url);
+      setEditMediaType(file.type.startsWith('video/') ? 'video' : 'image');
+      toast.success('File uploaded successfully!');
+    } catch (error: any) {
+      toast.error('Upload failed: ' + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const extractHashtags = (text: string) => {
+    const matches = text.match(/#[^\s#]+/g);
+    return matches ? Array.from(new Set(matches.map(tag => tag.toLowerCase()))) : [];
+  };
+
+  const handleSaveEdit = async () => {
+    if (!profile || (!editContent.trim() && !editMediaURL)) return;
+
+    setIsSaving(true);
+    try {
+      const hashtags = extractHashtags(editContent);
+      await updateDoc(doc(db, 'posts', post.id), {
+        content: editContent,
+        phone: editPhone || null,
+        mediaURL: editMediaURL || null,
+        mediaType: editMediaType || null,
+        type: editPostType,
+        bloodGroup: editBloodGroup || null,
+        hashtags
+      });
+      setIsEditing(false);
+      toast.success('Post updated successfully!');
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderContentWithHashtags = (content: string) => {
+    const parts = content.split(/(#[^\s#]+)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('#')) {
+        return (
+          <span 
+            key={i} 
+            onClick={() => onHashtagClick?.(part.toLowerCase())}
+            className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium"
+          >
+            {part}
+          </span>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -162,51 +258,179 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile }) => {
               )}
             </div>
             <div>
-              <h4 className="font-bold text-sm text-zinc-900 dark:text-white">{post.authorName}</h4>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-sm text-zinc-900 dark:text-white">{post.authorName}</h4>
+                {post.type === 'emergency' && (
+                  <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 text-[10px] font-bold rounded-md flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {post.bloodGroup} Emergency
+                  </span>
+                )}
+              </div>
               <p className="text-[10px] text-zinc-500">{new Date(post.createdAt).toLocaleString()}</p>
             </div>
           </div>
-          <div className="relative group">
-            <button className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full">
-              <MoreVertical className="h-4 w-4 text-zinc-400" />
-            </button>
-            {(profile?.uid === post.authorId || profile?.role === 'admin') && (
-              <div className="absolute right-0 top-full mt-1 bg-white dark:bg-zinc-800 shadow-xl border border-zinc-100 dark:border-zinc-700 rounded-xl py-1 hidden group-hover:block z-10">
-                <button
-                  onClick={handleDelete}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 w-full text-left"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Post
-                </button>
-              </div>
+          <div className="flex items-center gap-1">
+            {profile?.uid === post.authorId && !isEditing && (
+              <button
+                onClick={() => {
+                  setEditContent(post.content);
+                  setEditPhone(post.phone || '');
+                  setEditMediaURL(post.mediaURL || '');
+                  setEditMediaType(post.mediaType || null);
+                  setEditPostType(post.type);
+                  setEditBloodGroup(post.bloodGroup || '');
+                  setIsEditing(true);
+                }}
+                className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
+                title="Edit Post"
+              >
+                <Edit2 className="h-4 w-4" />
+              </button>
             )}
+            <div className="relative group">
+              <button className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full">
+                <MoreVertical className="h-4 w-4 text-zinc-400" />
+              </button>
+              <div className="absolute right-0 top-full mt-1 bg-white dark:bg-zinc-800 shadow-xl border border-zinc-100 dark:border-zinc-700 rounded-xl py-1 hidden group-hover:block z-10 min-w-[120px]">
+                {(profile?.uid === post.authorId || profile?.role === 'admin') && (
+                  <button
+                    onClick={handleDelete}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 w-full text-left"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Post
+                  </button>
+                )}
+                {profile?.uid !== post.authorId && (
+                  <button
+                    onClick={handleReport}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 w-full text-left"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                    Report Post
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
-        <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">
-          {post.content}
-        </p>
+        {isEditing ? (
+          <div className="space-y-4">
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 focus:ring-2 focus:ring-red-600 outline-none resize-none min-h-[100px] text-sm"
+            />
+            <div className="flex flex-wrap gap-3">
+              <select
+                value={editPostType}
+                onChange={(e) => setEditPostType(e.target.value as 'general' | 'emergency')}
+                className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-600"
+              >
+                <option value="general">General Post</option>
+                <option value="emergency">Emergency Request</option>
+              </select>
 
-        {post.phone && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 w-fit">
-            <Phone className="h-3.5 w-3.5 text-red-600" />
-            <a href={`tel:${post.phone}`} className="text-xs font-bold text-zinc-900 dark:text-white hover:text-red-600 transition-colors">
-              {post.phone}
-            </a>
-          </div>
-        )}
+              {editPostType === 'emergency' && (
+                <select
+                  value={editBloodGroup}
+                  onChange={(e) => setEditBloodGroup(e.target.value as BloodGroup)}
+                  className="bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-100 dark:border-red-800/50 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-600 font-bold"
+                >
+                  <option value="">Select Blood Group</option>
+                  {bloodGroups.map(bg => (
+                    <option key={bg} value={bg}>{bg}</option>
+                  ))}
+                </select>
+              )}
+            </div>
 
-        {post.mediaURL && (
-          <div className="rounded-xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
-            {post.mediaType === 'video' ? (
-              <div className="aspect-video bg-black relative group cursor-pointer">
-                <video src={post.mediaURL} className="w-full h-full object-cover" controls />
+            <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl px-4 py-2 border border-zinc-200 dark:border-zinc-700">
+              <Phone className="h-4 w-4 text-zinc-400" />
+              <input
+                type="tel"
+                placeholder="Phone number (optional)"
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                className="bg-transparent border-none outline-none text-sm w-full"
+              />
+            </div>
+            
+            {editMediaURL && (
+              <div className="relative rounded-2xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
+                <button 
+                  onClick={() => { setEditMediaURL(''); setEditMediaType(null); }}
+                  className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full hover:bg-black/70 z-10"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                {editMediaType === 'image' ? (
+                  <img src={editMediaURL} alt="Preview" className="w-full h-auto max-h-80 object-cover" />
+                ) : (
+                  <video src={editMediaURL} controls className="w-full max-h-80 bg-black" />
+                )}
               </div>
-            ) : (
-              <img src={post.mediaURL} alt="Post content" className="w-full h-auto" />
             )}
+
+            <div className="flex justify-between items-center pt-2">
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 font-medium text-zinc-500 hover:text-red-600 transition-colors cursor-pointer text-sm">
+                  <ImageIcon className="h-4 w-4" />
+                  Photo
+                  <input type="file" accept="image/*" className="hidden" onChange={handleEditFileUpload} disabled={isUploading} />
+                </label>
+                <label className="flex items-center gap-2 font-medium text-zinc-500 hover:text-red-600 transition-colors cursor-pointer text-sm">
+                  <Video className="h-4 w-4" />
+                  Video
+                  <input type="file" accept="video/*" className="hidden" onChange={handleEditFileUpload} disabled={isUploading} />
+                </label>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={isSaving || isUploading || (!editContent.trim() && !editMediaURL)}
+                  className="px-4 py-1.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+                </button>
+              </div>
+            </div>
           </div>
+        ) : (
+          <>
+            <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">
+              {renderContentWithHashtags(post.content)}
+            </p>
+
+            {post.phone && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 w-fit">
+                <Phone className="h-3.5 w-3.5 text-red-600" />
+                <a href={`tel:${post.phone}`} className="text-xs font-bold text-zinc-900 dark:text-white hover:text-red-600 transition-colors">
+                  {post.phone}
+                </a>
+              </div>
+            )}
+
+            {post.mediaURL && (
+              <div className="rounded-xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
+                {post.mediaType === 'video' ? (
+                  <div className="aspect-video bg-black relative group cursor-pointer">
+                    <video src={post.mediaURL} className="w-full h-full object-cover" controls />
+                  </div>
+                ) : (
+                  <img src={post.mediaURL} alt="Post content" className="w-full h-auto" />
+                )}
+              </div>
+            )}
+          </>
         )}
 
         <div className="flex items-center gap-4 pt-3 border-t border-zinc-50 dark:border-zinc-800/50">

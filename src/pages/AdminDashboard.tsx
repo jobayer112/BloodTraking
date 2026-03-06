@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase/config';
-import { collection, query, onSnapshot, limit, orderBy, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, limit, orderBy, where, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { 
@@ -18,9 +19,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { UserProfile, BloodRequest, Post } from '../types';
+import { canDonate } from '../utils/helpers';
+import { cn } from '../utils/helpers';
 
 const AdminDashboard = () => {
   const { profile } = useAuth();
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeDonors: 0,
@@ -30,8 +35,10 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const hasAccess = profile?.role === 'admin' || profile?.role === 'moderator';
+
   useEffect(() => {
-    if (profile?.role !== 'admin') return;
+    if (!hasAccess) return;
 
     // Real-time Stats
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
@@ -39,7 +46,7 @@ const AdminDashboard = () => {
       setStats(prev => ({
         ...prev,
         totalUsers: allUsers.length,
-        activeDonors: allUsers.filter(u => u.role === 'donor' && u.isAvailable).length
+        activeDonors: allUsers.filter(u => u.role === 'donor' && canDonate(u.lastDonationDate)).length
       }));
     });
 
@@ -118,36 +125,83 @@ const AdminDashboard = () => {
     }
   };
 
-  if (profile?.role !== 'admin') {
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminEmail === 'admin@gmail.com' && adminPassword === '1q2w3e4r5t') {
+      try {
+        await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+        toast.success('Admin logged in successfully');
+      } catch (error: any) {
+        // If login fails, try to create the admin account
+        try {
+          const userCred = await createUserWithEmailAndPassword(auth, adminEmail, adminPassword);
+          await setDoc(doc(db, 'users', userCred.user.uid), {
+            uid: userCred.user.uid,
+            email: adminEmail,
+            name: 'System Admin',
+            role: 'admin',
+            createdAt: new Date().toISOString(),
+            isVerified: true
+          });
+          toast.success('Admin account created and logged in');
+        } catch (createError: any) {
+          toast.error('Failed to login as admin: ' + createError.message);
+        }
+      }
+    } else {
+      toast.error('Invalid admin credentials');
+    }
+  };
+
+  if (!hasAccess) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-6 max-w-md px-4">
+        <div className="text-center space-y-6 max-w-md px-4 w-full">
           <div className="h-20 w-20 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center mx-auto">
             <ShieldCheck className="h-10 w-10 text-amber-500" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold">Admin Access Required</h2>
-            <p className="text-zinc-500">This area is restricted to administrators only. Please log in with an authorized administrator account.</p>
+            <h2 className="text-2xl font-bold">Admin Login</h2>
+            <p className="text-zinc-500">Please enter admin credentials to access the dashboard.</p>
           </div>
-          <div className="flex flex-col gap-3">
+          
+          <form onSubmit={handleAdminLogin} className="space-y-4 text-left">
+            <div>
+              <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email</label>
+              <input 
+                type="email" 
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">Password</label>
+              <input 
+                type="password" 
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-2 focus:ring-red-500 outline-none transition-all"
+                required
+              />
+            </div>
             <button 
-              onClick={() => window.location.href = '/'}
+              type="submit"
               className="w-full py-4 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
             >
-              <Home className="h-4 w-4" />
-              Back to Home
-            </button>
-            <button 
-              onClick={() => {
-                auth.signOut();
-                window.location.href = '/login';
-              }}
-              className="w-full py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-xl font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
-            >
               <Lock className="h-4 w-4" />
-              Login as Admin
+              Login
             </button>
-          </div>
+          </form>
+
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="w-full py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-xl font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+          >
+            <Home className="h-4 w-4" />
+            Back to Home
+          </button>
         </div>
       </div>
     );
@@ -157,9 +211,21 @@ const AdminDashboard = () => {
     <div className="max-w-7xl mx-auto px-4 py-12 space-y-12">
       <div className="flex justify-between items-center">
         <h1 className="text-4xl font-bold tracking-tight">Admin Control Panel</h1>
-        <div className="flex items-center gap-2 text-sm font-medium text-zinc-500">
-          <BarChart3 className="h-4 w-4" />
-          Real-time Analytics
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-zinc-500">
+            <BarChart3 className="h-4 w-4" />
+            Real-time Analytics
+          </div>
+          <button
+            onClick={() => {
+              auth.signOut();
+              window.location.href = '/login';
+            }}
+            className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-xl text-sm font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all flex items-center gap-2"
+          >
+            <Lock className="h-4 w-4" />
+            Logout
+          </button>
         </div>
       </div>
 
@@ -218,17 +284,6 @@ const AdminDashboard = () => {
               {users.map((user) => (
                 <tr key={user.uid} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
                   <td className="px-6 py-4">
-                    <select 
-                      value={user.role}
-                      onChange={(e) => handleRoleChange(user.uid, e.target.value)}
-                      className="bg-zinc-50 dark:bg-zinc-800 border-none rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-red-600 px-2 py-1"
-                    >
-                      <option value="donor">Donor</option>
-                      <option value="receiver">Receiver</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
                         <Users className="h-5 w-5 text-zinc-400" />
@@ -238,6 +293,19 @@ const AdminDashboard = () => {
                         <div className="text-xs text-zinc-500">{user.email}</div>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <select 
+                      value={user.role}
+                      onChange={(e) => handleRoleChange(user.uid, e.target.value)}
+                      disabled={profile?.role !== 'admin'}
+                      className="bg-zinc-50 dark:bg-zinc-800 border-none rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-red-600 px-2 py-1 disabled:opacity-50"
+                    >
+                      <option value="donor">Donor</option>
+                      <option value="receiver">Receiver</option>
+                      <option value="moderator">Moderator</option>
+                      <option value="admin">Admin</option>
+                    </select>
                   </td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg font-bold">
@@ -292,13 +360,15 @@ const AdminDashboard = () => {
                       >
                         <Ban className="h-5 w-5" />
                       </button>
-                      <button 
-                        onClick={() => handleDeleteUser(user.uid)}
-                        className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 rounded-lg transition-colors"
-                        title="Delete User"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
+                      {profile?.role === 'admin' && (
+                        <button 
+                          onClick={() => handleDeleteUser(user.uid)}
+                          className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 rounded-lg transition-colors"
+                          title="Delete User"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { Droplets, Users, Heart, Bell, Search, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../utils/helpers';
+import BloodDonationAnimation from '../components/BloodDonationAnimation';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -20,7 +21,7 @@ const Home = () => {
   return (
     <div className="space-y-12 pb-12">
       {/* Hero Section */}
-      <section className="relative h-[500px] flex items-center justify-center overflow-hidden bg-zinc-900 text-white">
+      <section className="relative min-h-[600px] flex items-center justify-center overflow-hidden bg-zinc-900 text-white py-20">
         <div className="absolute inset-0 z-0">
           <img 
             src="https://picsum.photos/seed/blood/1920/1080?blur=4" 
@@ -31,7 +32,15 @@ const Home = () => {
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-zinc-900/50" />
         </div>
         
-        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center space-y-8">
+        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center space-y-10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <BloodDonationAnimation />
+          </motion.div>
+
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -65,6 +74,38 @@ const Home = () => {
             >
               {t('request_blood')}
             </Link>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="max-w-md mx-auto pt-4"
+          >
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                const phone = new FormData(e.currentTarget).get('phone');
+                if (phone) window.location.href = `/search?phone=${phone}`;
+              }}
+              className="relative group"
+            >
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-zinc-400 group-focus-within:text-red-600 transition-colors" />
+              </div>
+              <input
+                type="text"
+                name="phone"
+                placeholder="Quick search by phone number..."
+                className="w-full pl-12 pr-24 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl outline-none focus:border-red-500 focus:bg-white/20 text-white placeholder:text-zinc-400 text-lg transition-all"
+              />
+              <button
+                type="submit"
+                className="absolute inset-y-2 right-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-all"
+              >
+                Search
+              </button>
+            </form>
           </motion.div>
         </div>
       </section>

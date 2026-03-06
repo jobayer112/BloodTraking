@@ -53,11 +53,7 @@ const AppContent = () => {
           />
           <Route 
             path="/admin" 
-            element={
-              <ProtectedRoute>
-                <AdminDashboard />
-              </ProtectedRoute>
-            } 
+            element={<AdminDashboard />} 
           />
         </Routes>
       </main>
@@ -72,7 +68,7 @@ const AppContent = () => {
               <span>2026 BloodTraking. All rights reserved.</span>
             </div>
             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-              Developed By <span className="text-red-600">MD ZOBAER HASAN</span>
+              Developed By <a href="https://zobaer-portfolio.lovable.app" target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">MD ZOBAER HASAN</a>
             </p>
           </div>
           <div className="flex items-center gap-6">

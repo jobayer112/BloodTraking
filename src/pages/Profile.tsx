@@ -7,7 +7,7 @@ import { motion } from 'motion/react';
 import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn } from '../utils/helpers';
+import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn, canDonate } from '../utils/helpers';
 
 const Profile = () => {
   const { t } = useTranslation();
@@ -23,7 +23,6 @@ const Profile = () => {
     upazila: '',
     weight: '' as string | number,
     height: '',
-    isAvailable: true,
     photoURL: '',
     lastDonationDate: '',
     medicalHistory: '',
@@ -41,7 +40,6 @@ const Profile = () => {
         upazila: profile.upazila || '',
         weight: profile.weight || '',
         height: profile.height || '',
-        isAvailable: profile.isAvailable ?? true,
         photoURL: profile.photoURL || '',
         lastDonationDate: profile.lastDonationDate || '',
         medicalHistory: profile.medicalHistory || '',
@@ -55,9 +53,9 @@ const Profile = () => {
     if (!profile) return;
     
     // Phone validation
-    const phoneRegex = /^(?:\+88|01)?\d{11}$/;
+    const phoneRegex = /^(?:\+8801|01)[3-9]\d{8}$/;
     if (formData.phone && !phoneRegex.test(formData.phone)) {
-      toast.error('Please enter a valid Bangladeshi phone number');
+      toast.error('Please enter a valid Bangladeshi phone number (e.g., 01712345678)');
       return;
     }
 
@@ -171,8 +169,14 @@ const Profile = () => {
         <div className="pt-12 pb-6 px-6 space-y-4">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{profile.name}</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                  {profile.name}
+                  <div className={cn(
+                    "h-3 w-3 rounded-full shadow-sm",
+                    canDonate(profile.lastDonationDate) ? "bg-emerald-500" : "bg-red-500"
+                  )} />
+                </h1>
                 {profile.isVerified && (
                   <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 dark:border-blue-900/30">
                     <CheckCircle className="h-2.5 w-2.5 fill-blue-600/10" />
@@ -311,18 +315,6 @@ const Profile = () => {
                   className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
                 />
               </div>
-              <div className="flex items-center gap-3 md:col-span-2">
-                <input
-                  type="checkbox"
-                  id="available"
-                  checked={formData.isAvailable}
-                  onChange={(e) => setFormData({ ...formData, isAvailable: e.target.checked })}
-                  className="h-5 w-5 rounded border-zinc-300 text-red-600 focus:ring-red-600"
-                />
-                <label htmlFor="available" className="font-semibold text-zinc-700 dark:text-zinc-300">
-                  {t('available')}
-                </label>
-              </div>
               <button
                 type="submit"
                 className="md:col-span-2 py-4 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all"
@@ -336,6 +328,11 @@ const Profile = () => {
                 <Droplets className="h-5 w-5 text-red-600" />
                 <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('blood_group')}</div>
                 <div className="text-lg font-bold text-zinc-900 dark:text-white">{profile.bloodGroup || 'Not Set'}</div>
+              </div>
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
+                <MapPin className="h-5 w-5 text-blue-600" />
+                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('division')}</div>
+                <div className="text-base font-bold text-zinc-900 dark:text-white">{profile.division || 'Not Set'}</div>
               </div>
               <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
                 <MapPin className="h-5 w-5 text-blue-600" />
@@ -359,6 +356,23 @@ const Profile = () => {
                 <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('height')}</div>
                 <div className="text-base font-bold text-zinc-900 dark:text-white">{profile.height || 'Not Set'}</div>
               </div>
+            </div>
+          )}
+
+          {!isEditing && (profile.medicalHistory || profile.donationPreferences) && (
+            <div className="mt-6 space-y-4">
+              {profile.medicalHistory && (
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-2">
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Medical History</div>
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">{profile.medicalHistory}</p>
+                </div>
+              )}
+              {profile.donationPreferences && (
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-2">
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Donation Preferences</div>
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">{profile.donationPreferences}</p>
+                </div>
+              )}
             </div>
           )}
         </div>

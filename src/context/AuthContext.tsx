@@ -61,7 +61,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email: firebaseUser.email || '',
             photoURL: firebaseUser.photoURL || '',
             role: isAdmin ? 'admin' : 'donor',
-            isAvailable: true,
             isVerified: isAdmin,
             donationCount: 0,
             lastDonationDate: null,

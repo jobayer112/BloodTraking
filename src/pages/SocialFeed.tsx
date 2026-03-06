@@ -4,13 +4,14 @@ import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, arrayUn
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
-import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, User, MoreVertical, Video, Play, X, Loader2, Upload, Phone } from 'lucide-react';
+import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, User, MoreVertical, Video, Play, X, Loader2, Upload, Phone, Filter, AlertCircle, Hash } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { Post } from '../types';
+import { Post, BloodGroup } from '../types';
 import { cn } from '../utils/helpers';
 
 import PostItem from '../components/PostItem';
+import { notifyAllUsers } from '../utils/notifications';
 
 const SocialFeed = () => {
   const { t } = useTranslation();
@@ -23,6 +24,19 @@ const SocialFeed = () => {
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [postType, setPostType] = useState<'general' | 'emergency'>('general');
+  const [postBloodGroup, setPostBloodGroup] = useState<BloodGroup | ''>('');
+  
+  const [filterType, setFilterType] = useState<'all' | 'general' | 'emergency'>('all');
+  const [filterBloodGroup, setFilterBloodGroup] = useState<BloodGroup | 'all'>('all');
+  const [filterHashtag, setFilterHashtag] = useState<string>('');
+
+  const bloodGroups: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+  const extractHashtags = (text: string) => {
+    const matches = text.match(/#[^\s#]+/g);
+    return matches ? Array.from(new Set(matches.map(tag => tag.toLowerCase()))) : [];
+  };
 
   useEffect(() => {
     const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
@@ -64,23 +78,39 @@ const SocialFeed = () => {
 
     setSubmitting(true);
     try {
+      const hashtags = extractHashtags(newPostContent);
       await addDoc(collection(db, 'posts'), {
         authorId: profile.uid,
         authorName: profile.name,
         authorPhoto: profile.photoURL || '',
         content: newPostContent,
         phone: phone || null,
-        type: 'general',
+        type: postType,
+        bloodGroup: postBloodGroup || null,
+        hashtags,
+        isReported: false,
         likes: [],
         commentCount: 0,
         mediaURL: mediaURL || null,
         mediaType: mediaType || null,
         createdAt: new Date().toISOString()
       });
+
+      // Notify all users about the new post
+      notifyAllUsers(
+        'New Community Post',
+        `${profile.name} shared a new post: "${newPostContent.substring(0, 30)}..."`,
+        'social',
+        '/feed',
+        profile.uid
+      );
+
       setNewPostContent('');
       setPhone('');
       setMediaURL('');
       setMediaType(null);
+      setPostType('general');
+      setPostBloodGroup('');
       toast.success(t('post') + ' shared!');
     } catch (error: any) {
       toast.error(error.message);
@@ -124,6 +154,30 @@ const SocialFeed = () => {
                   className="bg-transparent border-none outline-none text-sm w-full"
                 />
               </div>
+
+              <div className="flex flex-wrap gap-3">
+                <select
+                  value={postType}
+                  onChange={(e) => setPostType(e.target.value as 'general' | 'emergency')}
+                  className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-600"
+                >
+                  <option value="general">General Post</option>
+                  <option value="emergency">Emergency Request</option>
+                </select>
+
+                {postType === 'emergency' && (
+                  <select
+                    value={postBloodGroup}
+                    onChange={(e) => setPostBloodGroup(e.target.value as BloodGroup)}
+                    className="bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-100 dark:border-red-800/50 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-600 font-bold"
+                  >
+                    <option value="">Select Blood Group</option>
+                    {bloodGroups.map(bg => (
+                      <option key={bg} value={bg}>{bg}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
               
               {mediaURL && (
                 <div className="relative rounded-2xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
@@ -136,9 +190,7 @@ const SocialFeed = () => {
                   {mediaType === 'image' ? (
                     <img src={mediaURL} alt="Preview" className="w-full h-auto max-h-80 object-cover" />
                   ) : (
-                    <div className="aspect-video bg-zinc-900 flex items-center justify-center">
-                      <Play className="h-12 w-12 text-white opacity-50" />
-                    </div>
+                    <video src={mediaURL} controls className="w-full max-h-80 bg-black" />
                   )}
                 </div>
               )}
@@ -190,6 +242,46 @@ const SocialFeed = () => {
         </motion.div>
       )}
 
+      {/* Feed Filters */}
+      <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-800 space-y-4">
+        <div className="flex items-center gap-2 text-zinc-900 dark:text-white font-bold">
+          <Filter className="h-5 w-5" />
+          <h2>Filter Feed</h2>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as 'all' | 'general' | 'emergency')}
+            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-red-600"
+          >
+            <option value="all">All Posts</option>
+            <option value="general">General</option>
+            <option value="emergency">Emergency</option>
+          </select>
+
+          <select
+            value={filterBloodGroup}
+            onChange={(e) => setFilterBloodGroup(e.target.value as BloodGroup | 'all')}
+            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-red-600"
+          >
+            <option value="all">All Blood Groups</option>
+            {bloodGroups.map(bg => (
+              <option key={bg} value={bg}>{bg}</option>
+            ))}
+          </select>
+
+          {filterHashtag && (
+            <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 px-4 py-2 rounded-xl border border-blue-100 dark:border-blue-800/50 text-sm font-medium">
+              <Hash className="h-4 w-4" />
+              {filterHashtag}
+              <button onClick={() => setFilterHashtag('')} className="ml-1 hover:text-blue-800">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Feed */}
       {loading ? (
         <div className="flex justify-center py-20">
@@ -197,8 +289,20 @@ const SocialFeed = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          {posts.map((post) => (
-            <PostItem key={post.id} post={post} profile={profile} />
+          {posts
+            .filter(post => {
+              if (filterType !== 'all' && post.type !== filterType) return false;
+              if (filterBloodGroup !== 'all' && post.bloodGroup !== filterBloodGroup) return false;
+              if (filterHashtag && !post.hashtags?.includes(filterHashtag.toLowerCase())) return false;
+              return true;
+            })
+            .map((post) => (
+            <PostItem 
+              key={post.id} 
+              post={post} 
+              profile={profile} 
+              onHashtagClick={(tag) => setFilterHashtag(tag)}
+            />
           ))}
         </div>
       )}

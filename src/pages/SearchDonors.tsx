@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search as SearchIcon, MapPin, Droplets, Phone, User, CheckCircle, LayoutGrid, Map as MapIcon, X, Share2, Calendar, Weight, Ruler } from 'lucide-react';
-import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn } from '../utils/helpers';
+import { Search as SearchIcon, MapPin, Droplets, Phone, User, CheckCircle, LayoutGrid, Map as MapIcon, X, Share2, Calendar, Weight, Ruler, UserPlus } from 'lucide-react';
+import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn, canDonate } from '../utils/helpers';
 import { UserProfile } from '../types';
 import DonorMap from '../components/DonorMap';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const SearchDonors = () => {
   const { t } = useTranslation();
@@ -22,15 +23,18 @@ const SearchDonors = () => {
     district: searchParams.get('district') || '',
     availability: 'all', // 'all', 'available', 'unavailable'
     donationStatus: 'all', // 'all', 'ready' (4+ months since last donation)
+    phoneSearch: searchParams.get('phone') || '',
+    nameSearch: '',
+    sortByProximity: false,
   });
   const [selectedDonor, setSelectedDonor] = useState<UserProfile | null>(null);
+  const { profile } = useAuth();
 
   const fetchDonors = async () => {
     setLoading(true);
     try {
       let q = query(
         collection(db, 'users'),
-        where('isAvailable', '==', true),
         where('role', '==', 'donor')
       );
 
@@ -48,10 +52,17 @@ const SearchDonors = () => {
       let donorList = querySnapshot.docs.map(doc => doc.data() as UserProfile);
 
       // In-memory filtering for more complex criteria
+      if (filters.phoneSearch) {
+        donorList = donorList.filter(d => d.phone && d.phone.includes(filters.phoneSearch));
+      }
+      if (filters.nameSearch) {
+        const searchLower = filters.nameSearch.toLowerCase();
+        donorList = donorList.filter(d => d.name && d.name.toLowerCase().includes(searchLower));
+      }
       if (filters.availability === 'available') {
-        donorList = donorList.filter(d => d.isAvailable);
+        donorList = donorList.filter(d => canDonate(d.lastDonationDate));
       } else if (filters.availability === 'unavailable') {
-        donorList = donorList.filter(d => !d.isAvailable);
+        donorList = donorList.filter(d => !canDonate(d.lastDonationDate));
       }
 
       if (filters.donationStatus === 'ready') {
@@ -60,6 +71,24 @@ const SearchDonors = () => {
         donorList = donorList.filter(d => {
           if (!d.lastDonationDate) return true;
           return new Date(d.lastDonationDate) <= fourMonthsAgo;
+        });
+      }
+
+      // Sort by proximity if requested and user is logged in
+      if (filters.sortByProximity && profile) {
+        donorList.sort((a, b) => {
+          let scoreA = 0;
+          let scoreB = 0;
+          
+          if (a.upazila === profile.upazila) scoreA += 3;
+          if (a.district === profile.district) scoreA += 2;
+          if (a.division === profile.division) scoreA += 1;
+
+          if (b.upazila === profile.upazila) scoreB += 3;
+          if (b.district === profile.district) scoreB += 2;
+          if (b.division === profile.division) scoreB += 1;
+
+          return scoreB - scoreA; // Descending score
         });
       }
 
@@ -105,6 +134,25 @@ const SearchDonors = () => {
     }
   };
 
+  const addToContacts = (donor: UserProfile) => {
+    const vcard = `BEGIN:VCARD
+VERSION:3.0
+FN:${donor.name}
+TEL;TYPE=CELL:${donor.phone}
+NOTE:Blood Group: ${donor.bloodGroup}, Location: ${donor.district}
+END:VCARD`;
+    
+    const blob = new Blob([vcard], { type: 'text/vcard' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${donor.name.replace(/\s+/g, '_')}_contact.vcf`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Contact file generated');
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       <div className="text-center space-y-2">
@@ -114,9 +162,56 @@ const SearchDonors = () => {
         </p>
       </div>
 
+      {/* Prominent Search Fields */}
+      <div className="max-w-xl mx-auto space-y-4">
+        {/* Name Search */}
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <User className="h-5 w-5 text-zinc-400 group-focus-within:text-red-600 transition-colors" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search donor by name"
+            value={filters.nameSearch}
+            onChange={(e) => setFilters({ ...filters, nameSearch: e.target.value })}
+            className="w-full pl-12 pr-4 py-4 bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-2xl outline-none focus:border-red-600 dark:focus:border-red-600 shadow-sm text-lg transition-all"
+          />
+          {filters.nameSearch && (
+            <button
+              onClick={() => setFilters({ ...filters, nameSearch: '' })}
+              className="absolute inset-y-0 right-0 pr-4 flex items-center"
+            >
+              <X className="h-5 w-5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300" />
+            </button>
+          )}
+        </div>
+
+        {/* Phone Search */}
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Phone className="h-5 w-5 text-zinc-400 group-focus-within:text-red-600 transition-colors" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search donor by phone number (e.g. 01XXXXXXXXX)"
+            value={filters.phoneSearch}
+            onChange={(e) => setFilters({ ...filters, phoneSearch: e.target.value })}
+            className="w-full pl-12 pr-4 py-4 bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-2xl outline-none focus:border-red-600 dark:focus:border-red-600 shadow-sm text-lg transition-all"
+          />
+          {filters.phoneSearch && (
+            <button
+              onClick={() => setFilters({ ...filters, phoneSearch: '' })}
+              className="absolute inset-y-0 right-0 pr-4 flex items-center"
+            >
+              <X className="h-5 w-5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 items-end">
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('blood_group')}</label>
             <select
@@ -174,6 +269,19 @@ const SearchDonors = () => {
               <option value="ready">Ready to Donate (4+ months)</option>
             </select>
           </div>
+          {profile && (
+            <div className="space-y-1 flex flex-col justify-end pb-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filters.sortByProximity}
+                  onChange={(e) => setFilters({ ...filters, sortByProximity: e.target.checked })}
+                  className="rounded text-red-600 focus:ring-red-600 bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                />
+                <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Sort by Proximity</span>
+              </label>
+            </div>
+          )}
           <button
             onClick={fetchDonors}
             className="py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2 text-sm"
@@ -242,18 +350,34 @@ const SearchDonors = () => {
                     )}
                   </div>
                     <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1">
-                        <h3 className="font-bold text-sm text-zinc-900 dark:text-white">{donor.name}</h3>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="font-bold text-sm text-zinc-900 dark:text-white">
+                          {donor.name}
+                        </h3>
                         {donor.isVerified && (
-                          <div className="flex items-center gap-0.5 px-1 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[7px] font-bold border border-blue-100 dark:border-blue-900/30">
-                            <CheckCircle className="h-2 w-2 fill-blue-600/10" />
+                          <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[8px] font-bold border border-blue-100 dark:border-blue-900/30">
+                            <CheckCircle className="h-2.5 w-2.5 fill-blue-600/10" />
                             Verified
                           </div>
                         )}
                       </div>
-                      <p className="text-[10px] text-zinc-500 flex items-center gap-1">
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <div className={cn(
+                          "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold border",
+                          canDonate(donor.lastDonationDate) 
+                            ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-100 dark:border-emerald-900/30" 
+                            : "bg-red-50 dark:bg-red-900/20 text-red-600 border-red-100 dark:border-red-900/30"
+                        )}>
+                          <div className={cn(
+                            "h-1.5 w-1.5 rounded-full",
+                            canDonate(donor.lastDonationDate) ? "bg-emerald-500" : "bg-red-500"
+                          )} />
+                          {canDonate(donor.lastDonationDate) ? "Available" : "Unavailable"}
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 flex items-center gap-1 mt-0.5">
                         <MapPin className="h-2.5 w-2.5" />
-                        {donor.district}
+                        {donor.district}, {donor.division}
                       </p>
                     </div>
                 </div>
@@ -273,25 +397,35 @@ const SearchDonors = () => {
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <a
-                  href={`tel:${donor.phone}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:opacity-90 transition-all"
-                >
-                  <Phone className="h-3.5 w-3.5" />
-                  {t('call')}
-                </a>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleShare(donor);
-                  }}
-                  className="p-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
-                >
-                  <Share2 className="h-4 w-4" />
-                </button>
-              </div>
+                <div className="flex gap-2">
+                  <a
+                    href={`tel:${donor.phone}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:opacity-90 transition-all"
+                  >
+                    <Phone className="h-3.5 w-3.5" />
+                    {t('call')}
+                  </a>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addToContacts(donor);
+                    }}
+                    className="p-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+                    title="Add to Contacts"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleShare(donor);
+                    }}
+                    className="p-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </button>
+                </div>
             </motion.div>
           )) : (
             <div className="col-span-full text-center py-20 space-y-4">
@@ -331,9 +465,30 @@ const SearchDonors = () => {
                       )}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">{selectedDonor.name}</h2>
-                        {selectedDonor.isVerified && <CheckCircle className="h-5 w-5 text-blue-500 fill-current" />}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">
+                          {selectedDonor.name}
+                        </h2>
+                        {selectedDonor.isVerified && (
+                          <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-900/30">
+                            <CheckCircle className="h-3 w-3 fill-blue-600/10" />
+                            Verified
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-2 mb-1">
+                        <div className={cn(
+                          "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold border",
+                          canDonate(selectedDonor.lastDonationDate) 
+                            ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-100 dark:border-emerald-900/30" 
+                            : "bg-red-50 dark:bg-red-900/20 text-red-600 border-red-100 dark:border-red-900/30"
+                        )}>
+                          <div className={cn(
+                            "h-2 w-2 rounded-full",
+                            canDonate(selectedDonor.lastDonationDate) ? "bg-emerald-500" : "bg-red-500"
+                          )} />
+                          {canDonate(selectedDonor.lastDonationDate) ? "Available to Donate" : "Currently Unavailable"}
+                        </div>
                       </div>
                       <p className="text-zinc-500 font-medium flex items-center gap-1">
                         <MapPin className="h-4 w-4" />
@@ -412,11 +567,17 @@ const SearchDonors = () => {
                     {t('call')}
                   </a>
                   <button
+                    onClick={() => addToContacts(selectedDonor)}
+                    className="flex-1 py-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all"
+                  >
+                    <UserPlus className="h-5 w-5" />
+                    Add Contact
+                  </button>
+                  <button
                     onClick={() => handleShare(selectedDonor)}
-                    className="flex-1 py-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+                    className="p-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-2xl font-bold flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
                   >
                     <Share2 className="h-5 w-5" />
-                    {t('share_contact')}
                   </button>
                 </div>
               </div>
