@@ -5,9 +5,18 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase/config';
 import { UserProfile } from '../types';
+
+const generateShortId = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
 
 interface AuthContextType {
   user: User | null;
@@ -44,6 +53,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await updateDoc(docRef, { role: 'admin', isVerified: true });
           }
 
+          // Generate shortId if it doesn't exist
+          if (!data.shortId) {
+            const shortId = generateShortId();
+            data.shortId = shortId;
+            await updateDoc(docRef, { shortId });
+          }
+
           if (data.isBanned) {
             await firebaseSignOut(auth);
             setProfile(null);
@@ -62,6 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           const newProfile: Partial<UserProfile> = {
             uid: firebaseUser.uid,
+            shortId: generateShortId(),
             name: firebaseUser.displayName || 'Anonymous',
             email: firebaseUser.email || '',
             photoURL: firebaseUser.photoURL || '',
@@ -75,10 +92,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
 
           if (referralId) {
-            newProfile.invitedBy = referralId;
+            let inviterUid = referralId;
+            
+            // If referralId is a shortId (6 chars), find the actual UID
+            if (referralId.length === 6) {
+              const q = query(collection(db, 'users'), where('shortId', '==', referralId), limit(1));
+              const querySnap = await getDocs(q);
+              if (!querySnap.empty) {
+                inviterUid = querySnap.docs[0].id;
+              }
+            }
+
+            newProfile.invitedBy = inviterUid;
             // Increment inviter's count
             try {
-              await updateDoc(doc(db, 'users', referralId), {
+              await updateDoc(doc(db, 'users', inviterUid), {
                 inviteCount: increment(1)
               });
             } catch (e) {

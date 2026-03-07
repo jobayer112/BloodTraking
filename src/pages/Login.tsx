@@ -7,7 +7,16 @@ import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { auth, db } from '../firebase/config';
-import { doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, increment, collection, query, where, getDocs, limit } from 'firebase/firestore';
+
+const generateShortId = () => {
+  const digits = '0123456789';
+  let result = 'ref-';
+  for (let i = 0; i < 6; i++) {
+    result += digits.charAt(Math.floor(Math.random() * digits.length));
+  }
+  return result;
+};
 
 const Login = () => {
   const { t } = useTranslation();
@@ -70,6 +79,7 @@ const Login = () => {
       if (!docSnap.exists()) {
         const userData: any = {
           uid: user.uid,
+          shortId: generateShortId(),
           phone: user.phoneNumber,
           name: 'Anonymous Donor',
           role: 'donor',
@@ -82,10 +92,21 @@ const Login = () => {
         };
 
         if (referralId) {
-          userData.invitedBy = referralId;
+          let inviterUid = referralId;
+          
+          // If referralId is a shortId (6 chars), find the actual UID
+          if (referralId.length === 6) {
+            const q = query(collection(db, 'users'), where('shortId', '==', referralId), limit(1));
+            const querySnap = await getDocs(q);
+            if (!querySnap.empty) {
+              inviterUid = querySnap.docs[0].id;
+            }
+          }
+
+          userData.invitedBy = inviterUid;
           // Increment inviter's count
           try {
-            await updateDoc(doc(db, 'users', referralId), {
+            await updateDoc(doc(db, 'users', inviterUid), {
               inviteCount: increment(1)
             });
           } catch (e) {
@@ -119,6 +140,7 @@ const Login = () => {
         const isAdmin = email === 'zobaerhasan431@gmail.com' || user.uid === 'cWfThoHPOKdviqdkegbyAkDKLjA3';
         const userData: any = {
           uid: user.uid,
+          shortId: generateShortId(),
           email: user.email,
           name: email.split('@')[0],
           role: isAdmin ? 'admin' : 'donor',
@@ -131,10 +153,21 @@ const Login = () => {
         };
 
         if (referralId) {
-          userData.invitedBy = referralId;
+          let inviterUid = referralId;
+          
+          // If referralId is a shortId (6 chars), find the actual UID
+          if (referralId.length === 6) {
+            const q = query(collection(db, 'users'), where('shortId', '==', referralId), limit(1));
+            const querySnap = await getDocs(q);
+            if (!querySnap.empty) {
+              inviterUid = querySnap.docs[0].id;
+            }
+          }
+
+          userData.invitedBy = inviterUid;
           // Increment inviter's count
           try {
-            await updateDoc(doc(db, 'users', referralId), {
+            await updateDoc(doc(db, 'users', inviterUid), {
               inviteCount: increment(1)
             });
           } catch (e) {

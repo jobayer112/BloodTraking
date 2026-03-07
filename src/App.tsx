@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
@@ -15,6 +15,7 @@ import InviteFriends from './pages/InviteFriends';
 import Messages from './pages/Messages';
 import AdminDashboard from './pages/AdminDashboard';
 import Notifications from './pages/Notifications';
+import UserProfile from './pages/UserProfile';
 import AIChatbot from './components/AIChatbot';
 import { Shield, Lock } from 'lucide-react';
 import './i18n';
@@ -24,6 +25,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   if (loading) return null;
   if (!user) return <Navigate to="/login" />;
   return <>{children}</>;
+};
+
+const ReferralRedirect = () => {
+  const { refId } = useParams();
+  return <Navigate to={`/login?ref=${refId}`} replace />;
 };
 
 const AppContent = () => {
@@ -40,6 +46,8 @@ const AppContent = () => {
           <Route path="/contacts" element={<ContactDonors />} />
           <Route path="/sync" element={<ContactSync />} />
           <Route path="/invite" element={<InviteFriends />} />
+          <Route path="/user/:uid" element={<UserProfile />} />
+          <Route path="/r/:refId" element={<ReferralRedirect />} />
           <Route 
             path="/messages" 
             element={

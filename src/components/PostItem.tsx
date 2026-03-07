@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, arrayUnion, arrayRemove, increment, where, deleteDoc } from 'firebase/firestore';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, Heart, Share2, Send, User, MoreVertical, Play, X, Trash2, Phone, Reply, Edit2, AlertTriangle, Image as ImageIcon, Video, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 import { Post, Comment, UserProfile, BloodGroup } from '../types';
 import { cn } from '../utils/helpers';
 import { createNotification } from '../utils/notifications';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase/config';
+import { UserPlus, UserMinus } from 'lucide-react';
 
 interface PostItemProps {
   post: Post;
@@ -19,12 +22,63 @@ interface PostItemProps {
 
 const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) => {
   const { t } = useTranslation();
+  const { updateProfileState } = useAuth();
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const isLiked = profile ? post.likes.includes(profile.uid) : false;
+  const isFollowing = profile?.following?.includes(post.authorId || '') || false;
+
+  const handleFollow = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!profile) return toast.error('Please login to follow users');
+    if (!post.authorId || profile.uid === post.authorId) return;
+
+    try {
+      const currentUserRef = doc(db, 'users', profile.uid);
+      const targetUserRef = doc(db, 'users', post.authorId);
+
+      if (isFollowing) {
+        await updateDoc(currentUserRef, {
+          following: arrayRemove(post.authorId)
+        });
+        await updateDoc(targetUserRef, {
+          followers: arrayRemove(profile.uid)
+        });
+        updateProfileState({
+          ...profile,
+          following: profile.following?.filter(id => id !== post.authorId) || []
+        });
+        toast.success(`Unfollowed ${post.authorName}`);
+      } else {
+        await updateDoc(currentUserRef, {
+          following: arrayUnion(post.authorId)
+        });
+        await updateDoc(targetUserRef, {
+          followers: arrayUnion(profile.uid)
+        });
+        updateProfileState({
+          ...profile,
+          following: [...(profile.following || []), post.authorId]
+        });
+        
+        await createNotification(
+          post.authorId,
+          'New Follower',
+          `${profile.name} started following you.`,
+          'social',
+          `/user/${profile.uid}`
+        );
+        
+        toast.success(`Following ${post.authorName}`);
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
 
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
@@ -249,7 +303,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
     >
       <div className="p-4 space-y-3">
         <div className="flex justify-between items-start">
-          <div className="flex items-center gap-2">
+          <Link to={`/user/${post.authorId}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="h-9 w-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
               {post.authorPhoto ? (
                 <img src={post.authorPhoto} alt={post.authorName} className="h-full w-full rounded-xl object-cover" />
@@ -260,6 +314,29 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="font-bold text-sm text-zinc-900 dark:text-white">{post.authorName}</h4>
+                {profile && profile.uid !== post.authorId && (
+                  <button
+                    onClick={handleFollow}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md text-[10px] font-bold transition-all flex items-center gap-1",
+                      isFollowing 
+                        ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700" 
+                        : "bg-red-50 dark:bg-red-900/20 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30"
+                    )}
+                  >
+                    {isFollowing ? (
+                      <>
+                        <UserMinus className="h-3 w-3" />
+                        Following
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-3 w-3" />
+                        Follow
+                      </>
+                    )}
+                  </button>
+                )}
                 {post.type === 'emergency' && (
                   <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 text-[10px] font-bold rounded-md flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
@@ -269,7 +346,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
               </div>
               <p className="text-[10px] text-zinc-500">{new Date(post.createdAt).toLocaleString()}</p>
             </div>
-          </div>
+          </Link>
           <div className="flex items-center gap-1">
             {profile?.uid === post.authorId && !isEditing && (
               <button
@@ -478,16 +555,57 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                     {comments.filter(c => !c.parentId).map((comment) => (
                       <div key={comment.id} className="space-y-3">
                         <div className="flex gap-3">
-                          <div className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                          <Link to={`/user/${comment.authorId}`} className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity">
                             {comment.authorPhoto ? (
                               <img src={comment.authorPhoto} alt={comment.authorName} className="h-full w-full rounded-lg object-cover" />
                             ) : (
                               <User className="h-4 w-4 text-zinc-400" />
                             )}
-                          </div>
+                          </Link>
                           <div className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl rounded-tl-none relative">
                             <div className="flex justify-between items-center mb-1">
-                              <span className="font-bold text-xs">{comment.authorName}</span>
+                              <div className="flex items-center gap-2">
+                                <Link to={`/user/${comment.authorId}`} className="font-bold text-xs hover:text-red-600 transition-colors">{comment.authorName}</Link>
+                                {profile && profile.uid !== comment.authorId && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      // Reuse handleFollow logic or similar
+                                      // For simplicity, I'll just navigate to profile or add a mini follow button
+                                      // But the request said "next to each user's name"
+                                      // I'll implement a small follow button here too
+                                      const isFollowingCommentAuthor = profile.following?.includes(comment.authorId) || false;
+                                      
+                                      const toggleFollow = async () => {
+                                        try {
+                                          const currentUserRef = doc(db, 'users', profile.uid);
+                                          const targetUserRef = doc(db, 'users', comment.authorId);
+                                          if (isFollowingCommentAuthor) {
+                                            await updateDoc(currentUserRef, { following: arrayRemove(comment.authorId) });
+                                            await updateDoc(targetUserRef, { followers: arrayRemove(profile.uid) });
+                                            updateProfileState({ ...profile, following: profile.following?.filter(id => id !== comment.authorId) || [] });
+                                            toast.success(`Unfollowed ${comment.authorName}`);
+                                          } else {
+                                            await updateDoc(currentUserRef, { following: arrayUnion(comment.authorId) });
+                                            await updateDoc(targetUserRef, { followers: arrayUnion(profile.uid) });
+                                            updateProfileState({ ...profile, following: [...(profile.following || []), comment.authorId] });
+                                            toast.success(`Following ${comment.authorName}`);
+                                          }
+                                        } catch (err: any) { toast.error(err.message); }
+                                      };
+                                      toggleFollow();
+                                    }}
+                                    className={cn(
+                                      "text-[8px] font-bold px-1.5 py-0.5 rounded transition-colors",
+                                      profile.following?.includes(comment.authorId)
+                                        ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-500"
+                                        : "bg-red-50 dark:bg-red-900/20 text-red-600"
+                                    )}
+                                  >
+                                    {profile.following?.includes(comment.authorId) ? 'Following' : 'Follow'}
+                                  </button>
+                                )}
+                              </div>
                               <span className="text-[10px] text-zinc-500">{new Date(comment.createdAt).toLocaleDateString()}</span>
                             </div>
                             <p className="text-sm text-zinc-700 dark:text-zinc-300">{comment.content}</p>
@@ -505,16 +623,52 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                         <div className="ml-11 space-y-3 border-l-2 border-zinc-100 dark:border-zinc-800 pl-4">
                           {comments.filter(c => c.parentId === comment.id).map((reply) => (
                             <div key={reply.id} className="flex gap-3">
-                              <div className="h-7 w-7 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                              <Link to={`/user/${reply.authorId}`} className="h-7 w-7 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity">
                                 {reply.authorPhoto ? (
                                   <img src={reply.authorPhoto} alt={reply.authorName} className="h-full w-full rounded-lg object-cover" />
                                 ) : (
                                   <User className="h-3.5 w-3.5 text-zinc-400" />
                                 )}
-                              </div>
+                              </Link>
                               <div className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-2xl rounded-tl-none">
                                 <div className="flex justify-between items-center mb-1">
-                                  <span className="font-bold text-[11px]">{reply.authorName}</span>
+                                  <div className="flex items-center gap-2">
+                                    <Link to={`/user/${reply.authorId}`} className="font-bold text-[11px] hover:text-red-600 transition-colors">{reply.authorName}</Link>
+                                    {profile && profile.uid !== reply.authorId && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          const isFollowingReplyAuthor = profile.following?.includes(reply.authorId) || false;
+                                          const toggleFollow = async () => {
+                                            try {
+                                              const currentUserRef = doc(db, 'users', profile.uid);
+                                              const targetUserRef = doc(db, 'users', reply.authorId);
+                                              if (isFollowingReplyAuthor) {
+                                                await updateDoc(currentUserRef, { following: arrayRemove(reply.authorId) });
+                                                await updateDoc(targetUserRef, { followers: arrayRemove(profile.uid) });
+                                                updateProfileState({ ...profile, following: profile.following?.filter(id => id !== reply.authorId) || [] });
+                                                toast.success(`Unfollowed ${reply.authorName}`);
+                                              } else {
+                                                await updateDoc(currentUserRef, { following: arrayUnion(reply.authorId) });
+                                                await updateDoc(targetUserRef, { followers: arrayUnion(profile.uid) });
+                                                updateProfileState({ ...profile, following: [...(profile.following || []), reply.authorId] });
+                                                toast.success(`Following ${reply.authorName}`);
+                                              }
+                                            } catch (err: any) { toast.error(err.message); }
+                                          };
+                                          toggleFollow();
+                                        }}
+                                        className={cn(
+                                          "text-[7px] font-bold px-1 py-0.5 rounded transition-colors",
+                                          profile.following?.includes(reply.authorId)
+                                            ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-500"
+                                            : "bg-red-50 dark:bg-red-900/20 text-red-600"
+                                        )}
+                                      >
+                                        {profile.following?.includes(reply.authorId) ? 'Following' : 'Follow'}
+                                      </button>
+                                    )}
+                                  </div>
                                   <span className="text-[9px] text-zinc-500">{new Date(reply.createdAt).toLocaleDateString()}</span>
                                 </div>
                                 <p className="text-xs text-zinc-700 dark:text-zinc-300">{reply.content}</p>

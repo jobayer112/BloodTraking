@@ -26,6 +26,9 @@ export interface UserProfile {
   lng?: number;
   invitedBy?: string;
   inviteCount?: number;
+  shortId?: string;
+  following?: string[];
+  followers?: string[];
 }
 
 export interface BloodRequest {

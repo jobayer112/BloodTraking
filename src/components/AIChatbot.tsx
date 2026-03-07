@@ -24,6 +24,12 @@ const AIChatbot = () => {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [isOpen]);
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
@@ -53,7 +59,7 @@ const AIChatbot = () => {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999]">
+    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-[calc(env(safe-area-inset-right)+1rem)] sm:bottom-6 sm:right-6 z-[9999]">
       <AnimatePresence>
         {isOpen && (
           <>
@@ -70,10 +76,10 @@ const AIChatbot = () => {
               initial={{ opacity: 0, y: '100%' }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: '100%' }}
-              className="fixed inset-0 sm:absolute sm:inset-auto sm:bottom-16 sm:right-0 w-full sm:w-[400px] h-full sm:h-[500px] sm:max-h-[80vh] bg-white dark:bg-zinc-900 sm:rounded-[32px] shadow-2xl border-t sm:border border-zinc-100 dark:border-zinc-800 flex flex-col overflow-hidden z-[10000]"
+              className="fixed inset-0 sm:absolute sm:inset-auto sm:bottom-20 sm:right-0 w-full sm:w-[420px] h-full sm:h-[600px] sm:max-h-[calc(100vh-120px)] bg-white dark:bg-zinc-900 sm:rounded-[24px] shadow-2xl border-t sm:border border-zinc-100 dark:border-zinc-800 flex flex-col overflow-hidden z-[10000]"
             >
             {/* Header */}
-            <div className="p-4 bg-red-600 text-white flex justify-between items-center shrink-0">
+            <div className="p-4 pt-[calc(env(safe-area-inset-top)+1rem)] sm:pt-4 bg-red-600 text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 bg-white/20 rounded-2xl flex items-center justify-center">
                   <Bot className="h-6 w-6" />
@@ -117,8 +123,25 @@ const AIChatbot = () => {
                   <div className="h-8 w-8 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 flex items-center justify-center">
                     <Bot className="h-5 w-5" />
                   </div>
-                  <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl rounded-tl-none">
-                    <Loader2 className="h-4 w-4 animate-spin text-red-600" />
+                  <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl rounded-tl-none flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <motion.span
+                        animate={{ opacity: [0.4, 1, 0.4] }}
+                        transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
+                        className="h-1.5 w-1.5 bg-red-600 rounded-full"
+                      />
+                      <motion.span
+                        animate={{ opacity: [0.4, 1, 0.4] }}
+                        transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+                        className="h-1.5 w-1.5 bg-red-600 rounded-full"
+                      />
+                      <motion.span
+                        animate={{ opacity: [0.4, 1, 0.4] }}
+                        transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
+                        className="h-1.5 w-1.5 bg-red-600 rounded-full"
+                      />
+                    </div>
+                    <span className="text-xs text-zinc-500 font-medium italic">typing...</span>
                   </div>
                 </div>
               )}
@@ -126,24 +149,32 @@ const AIChatbot = () => {
             </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 shrink-0">
-              <div className="flex gap-2 items-center">
+            <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:pb-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 shrink-0">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSend();
+                }}
+                className="flex gap-2 items-center"
+              >
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                   placeholder="Ask anything..."
                   className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-red-600 min-w-0"
+                  autoFocus
+                  inputMode="text"
+                  enterKeyHint="send"
                 />
                 <button
-                  onClick={handleSend}
+                  type="submit"
                   disabled={loading || !input.trim()}
                   className="p-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all disabled:opacity-50 shrink-0"
                 >
                   <Send className="h-5 w-5" />
                 </button>
-              </div>
+              </form>
             </div>
           </motion.div>
         </>
@@ -154,7 +185,7 @@ const AIChatbot = () => {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="h-14 w-14 bg-red-600 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:bg-red-700 transition-all"
+        className="h-12 w-12 sm:h-14 sm:w-14 bg-red-600 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:bg-red-700 transition-all"
       >
         {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </motion.button>

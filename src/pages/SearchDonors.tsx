@@ -17,7 +17,7 @@ import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn, canDonate, getBadge
 import { UserProfile } from '../types';
 import DonorMap from '../components/DonorMap';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
@@ -39,7 +39,6 @@ const SearchDonors = () => {
     radius: 0, // 0 means no radius filter
     sortByProximity: false,
   });
-  const [selectedDonor, setSelectedDonor] = useState<UserProfile | null>(null);
   const { profile } = useAuth();
 
   const fetchDonors = async () => {
@@ -406,7 +405,7 @@ END:VCARD`;
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
         >
-          <DonorMap donors={donors} onDonorSelect={setSelectedDonor} />
+          <DonorMap donors={donors} onDonorSelect={(donor) => navigate(`/user/${donor.uid}`)} />
         </motion.div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -416,7 +415,7 @@ END:VCARD`;
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              onClick={() => setSelectedDonor(donor)}
+              onClick={() => navigate(`/user/${donor.uid}`)}
               className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all space-y-4 cursor-pointer group"
             >
               <div className="flex justify-between items-start">
@@ -535,169 +534,6 @@ END:VCARD`;
           )}
         </div>
       )}
-      {/* Donor Details Modal */}
-      <AnimatePresence>
-        {selectedDonor && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedDonor(null)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-[32px] shadow-2xl overflow-hidden"
-            >
-              <div className="p-8 space-y-8">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-4">
-                    <div className="h-20 w-20 rounded-3xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
-                      {selectedDonor.photoURL ? (
-                        <img src={selectedDonor.photoURL} alt={selectedDonor.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <User className="h-10 w-10 text-zinc-400" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">
-                          {selectedDonor.name}
-                        </h2>
-                        {selectedDonor.isVerified && (
-                          <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-900/30">
-                            <CheckCircle className="h-3 w-3 fill-blue-600/10" />
-                            Verified
-                          </div>
-                        )}
-                        {getBadge(selectedDonor.donationCount) && (
-                          <div className={cn(
-                            "flex items-center gap-1 px-2 py-1 bg-zinc-50 dark:bg-zinc-900/20 rounded-full text-xs font-bold border border-zinc-100 dark:border-zinc-800",
-                            getBadge(selectedDonor.donationCount)?.color
-                          )}>
-                            <span>{getBadge(selectedDonor.donationCount)?.icon}</span>
-                            {getBadge(selectedDonor.donationCount)?.name}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2 mb-1">
-                        <div className={cn(
-                          "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold border",
-                          canDonate(selectedDonor.lastDonationDate) 
-                            ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-100 dark:border-emerald-900/30" 
-                            : "bg-red-50 dark:bg-red-900/20 text-red-600 border-red-100 dark:border-red-900/30"
-                        )}>
-                          <div className={cn(
-                            "h-2 w-2 rounded-full",
-                            canDonate(selectedDonor.lastDonationDate) ? "bg-emerald-500" : "bg-red-500"
-                          )} />
-                          {canDonate(selectedDonor.lastDonationDate) ? "Available to Donate" : "Currently Unavailable"}
-                        </div>
-                      </div>
-                      <p className="text-zinc-500 font-medium flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        {selectedDonor.upazila}, {selectedDonor.district}, {selectedDonor.division}
-                      </p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setSelectedDonor(null)}
-                    className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
-                  >
-                    <X className="h-6 w-6 text-zinc-400" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/20 text-center space-y-1">
-                    <p className="text-[10px] font-bold text-red-600/60 uppercase tracking-wider">{t('blood_group')}</p>
-                    <p className="text-3xl font-black text-red-600">{selectedDonor.bloodGroup}</p>
-                  </div>
-                  <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 text-center space-y-1">
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('donation_count')}</p>
-                    <p className="text-3xl font-black text-zinc-900 dark:text-white">{selectedDonor.donationCount}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <Calendar className="h-5 w-5 text-zinc-400" />
-                      <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{t('last_donation')}</span>
-                    </div>
-                    <span className="font-bold">{selectedDonor.lastDonationDate || 'Never'}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl">
-                      <Weight className="h-5 w-5 text-zinc-400" />
-                      <div>
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase">{t('weight')}</p>
-                        <p className="font-bold">{selectedDonor.weight || 'N/A'} kg</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl">
-                      <Ruler className="h-5 w-5 text-zinc-400" />
-                      <div>
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase">{t('height')}</p>
-                        <p className="font-bold">{selectedDonor.height || 'N/A'}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {(selectedDonor.medicalHistory || selectedDonor.donationPreferences) && (
-                  <div className="space-y-4">
-                    {selectedDonor.medicalHistory && (
-                      <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-900/20">
-                        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">Medical History</p>
-                        <p className="text-sm text-zinc-700 dark:text-zinc-300">{selectedDonor.medicalHistory}</p>
-                      </div>
-                    )}
-                    {selectedDonor.donationPreferences && (
-                      <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20">
-                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Donation Preferences</p>
-                        <p className="text-sm text-zinc-700 dark:text-zinc-300">{selectedDonor.donationPreferences}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                <div className="flex gap-3 pt-4">
-                  <a
-                    href={`tel:${selectedDonor.phone}`}
-                    className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 transition-all shadow-lg shadow-red-600/20"
-                  >
-                    <Phone className="h-5 w-5" />
-                    {t('call')}
-                  </a>
-                  <button
-                    onClick={() => startChat(selectedDonor)}
-                    className="p-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl font-bold flex items-center justify-center hover:opacity-90 transition-all"
-                  >
-                    <MessageSquare className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => addToContacts(selectedDonor)}
-                    className="flex-1 py-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all"
-                  >
-                    <UserPlus className="h-5 w-5" />
-                    Add Contact
-                  </button>
-                  <button
-                    onClick={() => handleShare(selectedDonor)}
-                    className="p-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-2xl font-bold flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
-                  >
-                    <Share2 className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

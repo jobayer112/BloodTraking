@@ -12,17 +12,19 @@ import {
   Gift,
   Users,
   Heart,
-  QrCode
+  QrCode,
+  Download
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { QRCodeSVG } from 'qrcode.react';
 
 const InviteFriends = () => {
   const { profile } = useAuth();
   const [copied, setCopied] = useState(false);
 
-  // In a real app, this would be a unique referral link
-  const inviteLink = `${window.location.origin}/login?ref=${profile?.uid || 'guest'}`;
-  const inviteMessage = `Join me on BloodTraking! Help save lives by becoming a blood donor or finding donors quickly in emergencies. Register here: ${inviteLink}`;
+  // Shorter referral link using shortId
+  const inviteLink = `${window.location.origin}/r/${profile?.shortId || profile?.uid || 'guest'}`;
+  const inviteMessage = `Join BloodTraking and save lives! Register here: ${inviteLink}`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(inviteMessage);
@@ -68,7 +70,7 @@ const InviteFriends = () => {
           <div className="space-y-4">
             <h2 className="text-xl font-bold">Your Invite Link</h2>
             <div className="relative group">
-              <div className="w-full p-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm font-mono break-all pr-12">
+              <div className="w-full p-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs font-mono break-all pr-12">
                 {inviteLink}
               </div>
               <button 
@@ -194,14 +196,44 @@ const InviteFriends = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-zinc-900 p-8 rounded-[3rem] border border-zinc-100 dark:border-zinc-800 flex items-center gap-6">
-            <div className="h-24 w-24 bg-zinc-50 dark:bg-zinc-800 rounded-2xl flex items-center justify-center border border-zinc-100 dark:border-zinc-700">
-              <QrCode className="h-12 w-12 text-zinc-300" />
+          <div className="bg-white dark:bg-zinc-900 p-8 rounded-[3rem] border border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center gap-6">
+            <div className="p-4 bg-white rounded-2xl border border-zinc-100 dark:border-zinc-700 shadow-sm">
+              <QRCodeSVG 
+                value={inviteLink}
+                size={120}
+                level="H"
+                includeMargin={false}
+              />
             </div>
-            <div className="flex-1 space-y-1">
+            <div className="flex-1 space-y-1 text-center sm:text-left">
               <h3 className="font-bold">Personal QR Code</h3>
               <p className="text-xs text-zinc-500">Let friends scan your phone to join instantly.</p>
-              <button className="text-xs font-bold text-red-600 hover:underline pt-2">Generate QR Code</button>
+              <div className="flex flex-wrap gap-2 pt-2 justify-center sm:justify-start">
+                <button 
+                  onClick={() => {
+                    const svg = document.querySelector('.bg-white svg') as SVGElement;
+                    if (!svg) return;
+                    const svgData = new XMLSerializer().serializeToString(svg);
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const img = new Image();
+                    img.onload = () => {
+                      canvas.width = img.width;
+                      canvas.height = img.height;
+                      ctx?.drawImage(img, 0, 0);
+                      const pngFile = canvas.toDataURL('image/png');
+                      const downloadLink = document.createElement('a');
+                      downloadLink.download = `invite_qr_${profile?.shortId || 'bloodtraking'}.png`;
+                      downloadLink.href = pngFile;
+                      downloadLink.click();
+                    };
+                    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+                  }}
+                  className="text-[10px] font-bold text-red-600 hover:underline flex items-center gap-1"
+                >
+                  <Download className="h-3 w-3" /> Download
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>

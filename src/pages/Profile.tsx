@@ -6,7 +6,8 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
 import { motion } from 'motion/react';
-import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera, Loader2, Share2 } from 'lucide-react';
+import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera, Loader2, Share2, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn, canDonate, getBadge } from '../utils/helpers';
@@ -396,7 +397,7 @@ const Profile = () => {
       </motion.div>
 
       {/* Stats & Badges */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-4">
           <h3 className="text-sm font-bold flex items-center gap-2">
             <Shield className="h-4 w-4 text-red-600" />
@@ -409,6 +410,23 @@ const Profile = () => {
             </div>
             <div className="h-8 w-8 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
               <Heart className="h-4 w-4 text-red-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-4">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <User className="h-4 w-4 text-emerald-600" />
+            Social
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl text-center">
+              <div className="text-xl font-bold text-emerald-600">{profile.followers?.length || 0}</div>
+              <div className="text-[10px] font-medium text-zinc-500 uppercase">Followers</div>
+            </div>
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl text-center">
+              <div className="text-xl font-bold text-blue-600">{profile.following?.length || 0}</div>
+              <div className="text-[10px] font-medium text-zinc-500 uppercase">Following</div>
             </div>
           </div>
         </div>
@@ -430,6 +448,91 @@ const Profile = () => {
           </div>
         </div>
       </div>
+
+      {/* QR Code Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-100 dark:border-zinc-800 shadow-xl flex flex-col md:flex-row items-center gap-8"
+      >
+        <div className="p-4 bg-white rounded-2xl shadow-inner border border-zinc-100">
+          <QRCodeSVG 
+            value={`${window.location.origin}/user/${profile.uid}`}
+            size={160}
+            level="H"
+            includeMargin={true}
+            imageSettings={{
+              src: "/logo.png",
+              x: undefined,
+              y: undefined,
+              height: 24,
+              width: 24,
+              excavate: true,
+            }}
+          />
+        </div>
+        <div className="flex-1 text-center md:text-left space-y-3">
+          <div className="flex items-center justify-center md:justify-start gap-2 text-red-600">
+            <QrCode className="h-5 w-5" />
+            <h3 className="text-xl font-bold">Your Personal QR Code</h3>
+          </div>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md">
+            This QR code links directly to your public profile. Other donors can scan this to quickly find your contact information and blood group.
+          </p>
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
+            <button 
+              onClick={() => {
+                const canvas = document.querySelector('canvas');
+                if (canvas) {
+                  const url = canvas.toDataURL('image/png');
+                  const link = document.createElement('a');
+                  link.download = `bloodtraking-qr-${profile.name}.png`;
+                  link.href = url;
+                  link.click();
+                } else {
+                  // Fallback for SVG
+                  const svg = document.querySelector('svg[role="img"]');
+                  if (svg) {
+                    const svgData = new XMLSerializer().serializeToString(svg);
+                    const canvas = document.createElement("canvas");
+                    const ctx = canvas.getContext("2d");
+                    const img = new Image();
+                    img.onload = () => {
+                      canvas.width = img.width;
+                      canvas.height = img.height;
+                      ctx?.drawImage(img, 0, 0);
+                      const pngFile = canvas.toDataURL("image/png");
+                      const downloadLink = document.createElement("a");
+                      downloadLink.download = `bloodtraking-qr-${profile.name}.png`;
+                      downloadLink.href = pngFile;
+                      downloadLink.click();
+                    };
+                    img.src = "data:image/svg+xml;base64," + btoa(svgData);
+                  }
+                }
+              }}
+              className="px-6 py-2 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all"
+            >
+              Download QR
+            </button>
+            <button 
+              onClick={() => {
+                navigator.share({
+                  title: 'My BloodTraking Profile',
+                  text: `Check out my blood donor profile on BloodTraking!`,
+                  url: `${window.location.origin}/user/${profile.uid}`
+                }).catch(() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/user/${profile.uid}`);
+                  toast.success('Profile link copied!');
+                });
+              }}
+              className="px-6 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
+            >
+              Share Profile
+            </button>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Share & Invite */}
       <motion.div
