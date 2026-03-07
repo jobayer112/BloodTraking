@@ -136,7 +136,7 @@ const AIChatbot = () => {
               initial={{ opacity: 0, y: '100%' }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: '100%' }}
-              className="fixed inset-0 sm:absolute sm:inset-auto sm:bottom-20 sm:right-0 w-full sm:w-[420px] h-full sm:h-[600px] sm:max-h-[calc(100vh-120px)] bg-white dark:bg-zinc-900 sm:rounded-[24px] shadow-2xl border-t sm:border border-zinc-100 dark:border-zinc-800 flex flex-col overflow-hidden z-[10000]"
+              className="fixed inset-0 sm:absolute sm:inset-auto sm:bottom-20 sm:right-0 w-full sm:w-[420px] h-[100dvh] sm:h-[600px] sm:max-h-[calc(100vh-120px)] bg-white dark:bg-zinc-900 sm:rounded-[24px] shadow-2xl border-t sm:border border-zinc-100 dark:border-zinc-800 flex flex-col overflow-hidden z-[10000]"
             >
               {/* Header */}
               <div className="p-4 pt-[calc(env(safe-area-inset-top)+1rem)] sm:pt-4 bg-red-600 text-white flex justify-between items-center shrink-0">

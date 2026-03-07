@@ -11,6 +11,8 @@ import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn } from '../utils/hel
 import { BloodRequest } from '../types';
 import { notifyMatchingDonors, createNotification } from '../utils/notifications';
 
+import ConfirmationModal from '../components/ConfirmationModal';
+
 const BloodRequests = () => {
   const { t } = useTranslation();
   const { profile } = useAuth();
@@ -21,6 +23,8 @@ const BloodRequests = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
   const [newRequest, setNewRequest] = useState({
     bloodGroup: '',
     emergencyLevel: 'normal',
@@ -96,11 +100,18 @@ const BloodRequests = () => {
     }
   };
 
-  const handleDelete = async (requestId: string) => {
-    if (!window.confirm('Are you sure you want to delete this request?')) return;
+  const handleDelete = (requestId: string) => {
+    setRequestToDelete(requestId);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!requestToDelete) return;
     try {
-      await deleteDoc(doc(db, 'bloodRequests', requestId));
+      await deleteDoc(doc(db, 'bloodRequests', requestToDelete));
       toast.success('Request deleted successfully');
+      setDeleteModalOpen(false);
+      setRequestToDelete(null);
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -447,6 +458,16 @@ const BloodRequests = () => {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title="Delete Request"
+        message="Are you sure you want to delete this blood request? This action cannot be undone."
+        confirmText="Delete"
+        isDangerous={true}
+      />
     </div>
   );
 };

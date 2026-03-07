@@ -186,6 +186,8 @@ const Home = () => {
         </div>
       </section>
 
+
+
       {/* Features Grid */}
       <section className="max-w-7xl mx-auto px-4 space-y-12">
         <div className="text-center space-y-4">

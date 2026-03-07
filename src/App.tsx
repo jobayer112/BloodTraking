@@ -1,7 +1,8 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useParams, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -33,6 +34,9 @@ const ReferralRedirect = () => {
 };
 
 const AppContent = () => {
+  const location = useLocation();
+  const isMessagesPage = location.pathname === '/messages';
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
       <Navbar />
@@ -81,35 +85,39 @@ const AppContent = () => {
       <Toaster position="top-right" />
       <AIChatbot />
       
-      <footer className="bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 py-8 mt-12">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex flex-col items-center md:items-start gap-1">
-            <div className="flex items-center gap-2 text-zinc-500 text-sm">
-              <Link to="/admin" className="hover:text-red-600 transition-colors">©</Link>
-              <span>2026 BloodTraking. All rights reserved.</span>
+      {!isMessagesPage && (
+        <footer className="bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 py-8 mt-12">
+          <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex flex-col items-center md:items-start gap-1">
+              <div className="flex items-center gap-2 text-zinc-500 text-sm">
+                <Link to="/admin" className="hover:text-red-600 transition-colors">©</Link>
+                <span>2026 BloodTraking. All rights reserved.</span>
+              </div>
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                Developed By <a href="https://zobaer-portfolio.lovable.app" target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">MD ZOBAER HASAN</a>
+              </p>
             </div>
-            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-              Developed By <a href="https://zobaer-portfolio.lovable.app" target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline">MD ZOBAER HASAN</a>
-            </p>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-zinc-400 text-[10px] font-medium">
-              <Shield className="h-3 w-3" />
-              <span>Secure Platform</span>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 text-zinc-400 text-[10px] font-medium">
+                <Shield className="h-3 w-3" />
+                <span>Secure Platform</span>
+              </div>
             </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 };
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

@@ -157,12 +157,26 @@ const Profile = () => {
     }
   };
 
+  const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+
   const generateAIAvatar = async () => {
     if (!profile) return;
     setGeneratingAvatar(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const prompt = `A clean, modern, minimalist 3D avatar for a blood donor profile. The avatar should be friendly, wearing casual clothes, with a subtle red accent color. Solid light background. High quality, 8k resolution.`;
+      
+      // Personalize prompt based on available profile data
+      const name = profile.name || '';
+      const genderHint = name.toLowerCase().includes('mr') ? 'male' : 
+                        name.toLowerCase().includes('ms') || name.toLowerCase().includes('mrs') ? 'female' : 'person';
+      
+      const prompt = `A clean, modern, minimalist 3D avatar for a blood donor profile. 
+      The character is a friendly ${genderHint}. 
+      They are wearing casual clothes with a subtle red accent color to represent blood donation. 
+      The background is a solid, soft light color. 
+      The style is 3D render, high quality, 8k resolution, cute and approachable.
+      Blood group ${profile.bloodGroup || 'O+'} badge visible on shirt.`;
       
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
@@ -197,31 +211,10 @@ const Profile = () => {
       const blob = new Blob([byteArray], { type: 'image/png' });
       const file = new File([blob], `ai_avatar_${Date.now()}.png`, { type: 'image/png' });
 
-      // Optimistic update
+      // Set preview instead of uploading immediately
       const objectUrl = URL.createObjectURL(file);
-      setFormData(prev => ({ ...prev, photoURL: objectUrl }));
-      updateProfileState({ ...profile, photoURL: objectUrl } as any);
-
-      // Upload to Firebase
-      const storageRef = ref(storage, `profiles/${profile.uid}/${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-
-      uploadTask.on('state_changed', null, 
-        (error) => {
-          toast.error('Failed to save AI avatar');
-        }, 
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          const userRef = doc(db, 'users', profile.uid);
-          await updateDoc(userRef, { photoURL: downloadURL, updatedAt: new Date().toISOString() });
-          if (auth.currentUser) {
-            await updateProfile(auth.currentUser, { photoURL: downloadURL });
-          }
-          setFormData(prev => ({ ...prev, photoURL: downloadURL }));
-          updateProfileState({ ...profile, photoURL: downloadURL } as any);
-          toast.success('AI Avatar generated and saved!');
-        }
-      );
+      setPreviewAvatar(objectUrl);
+      setPreviewFile(file);
 
     } catch (error: any) {
       console.error("AI Avatar generation error:", error);
@@ -229,6 +222,60 @@ const Profile = () => {
     } finally {
       setGeneratingAvatar(false);
     }
+  };
+
+  const saveGeneratedAvatar = async () => {
+    if (!previewFile || !profile) return;
+    setUploading(true);
+    
+    try {
+      // Upload to Firebase
+      const storageRef = ref(storage, `profiles/${profile.uid}/${previewFile.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, previewFile);
+
+      uploadTask.on('state_changed', null, 
+        (error) => {
+          toast.error('Failed to save AI avatar');
+          setUploading(false);
+        }, 
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          
+          // Update Firestore
+          const userRef = doc(db, 'users', profile.uid);
+          await updateDoc(userRef, { 
+            photoURL: downloadURL, 
+            updatedAt: new Date().toISOString() 
+          });
+          
+          // Update Auth
+          if (auth.currentUser) {
+            await updateProfile(auth.currentUser, { photoURL: downloadURL });
+          }
+          
+          // Update local state
+          setFormData(prev => ({ ...prev, photoURL: downloadURL }));
+          updateProfileState({ ...profile, photoURL: downloadURL } as any);
+          
+          // Cleanup
+          if (previewAvatar) URL.revokeObjectURL(previewAvatar);
+          setPreviewAvatar(null);
+          setPreviewFile(null);
+          setUploading(false);
+          toast.success('New profile picture saved!');
+        }
+      );
+    } catch (error) {
+      console.error("Save avatar error:", error);
+      toast.error('Failed to save avatar');
+      setUploading(false);
+    }
+  };
+
+  const cancelAvatarPreview = () => {
+    if (previewAvatar) URL.revokeObjectURL(previewAvatar);
+    setPreviewAvatar(null);
+    setPreviewFile(null);
   };
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
@@ -292,22 +339,20 @@ const Profile = () => {
           </div>
           
           {/* AI Avatar Button */}
-          {!formData.photoURL && (
-            <div className="absolute -bottom-10 right-6">
-              <button
-                onClick={generateAIAvatar}
-                disabled={generatingAvatar}
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all shadow-sm disabled:opacity-50"
-              >
-                {generatingAvatar ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-red-600" />
-                ) : (
-                  <Sparkles className="h-4 w-4 text-red-600" />
-                )}
-                <span className="hidden sm:inline">Generate Avatar</span>
-              </button>
-            </div>
-          )}
+          <div className="absolute -bottom-10 right-6">
+            <button
+              onClick={generateAIAvatar}
+              disabled={generatingAvatar}
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all shadow-sm disabled:opacity-50"
+            >
+              {generatingAvatar ? (
+                <Loader2 className="h-4 w-4 animate-spin text-red-600" />
+              ) : (
+                <Sparkles className="h-4 w-4 text-red-600" />
+              )}
+              <span className="hidden sm:inline">Generate Avatar</span>
+            </button>
+          </div>
         </div>
 
         <div className="pt-12 pb-6 px-6 space-y-4">
@@ -782,6 +827,67 @@ const Profile = () => {
           </form>
         </div>
       </motion.div>
+      {/* AI Avatar Preview Modal */}
+      {previewAvatar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-sm w-full space-y-6 shadow-2xl border border-zinc-100 dark:border-zinc-800"
+          >
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">AI Avatar Generated!</h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Here is your unique avatar based on your profile. Would you like to set it as your profile picture?
+              </p>
+            </div>
+
+            <div className="relative aspect-square rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 ring-4 ring-white dark:ring-zinc-800 shadow-lg">
+              <img 
+                src={previewAvatar} 
+                alt="AI Generated Avatar" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={cancelAvatarPreview}
+                disabled={uploading}
+                className="px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveGeneratedAvatar}
+                disabled={uploading}
+                className="px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    Save Avatar
+                  </>
+                )}
+              </button>
+            </div>
+            
+            <button
+              onClick={generateAIAvatar}
+              disabled={uploading || generatingAvatar}
+              className="w-full py-2 text-sm font-medium text-zinc-500 hover:text-red-600 transition-colors flex items-center justify-center gap-1"
+            >
+              <Sparkles className="h-3 w-3" />
+              Generate New One
+            </button>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

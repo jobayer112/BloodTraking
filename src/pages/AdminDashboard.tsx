@@ -443,7 +443,6 @@ const AdminDashboard = () => {
                       </div>
                       <div>
                         <div className="font-bold text-zinc-900 dark:text-white">{user.name}</div>
-                        <div className="text-xs text-zinc-500">{user.email}</div>
                       </div>
                     </div>
                   </td>

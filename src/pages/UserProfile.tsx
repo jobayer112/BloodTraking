@@ -396,10 +396,6 @@ const UserProfile = () => {
                         </div>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-zinc-500">Email Address</span>
-                        <span className="font-medium text-zinc-900 dark:text-white">{profile.email}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
                         <span className="text-sm text-zinc-500">Location</span>
                         <span className="font-medium text-zinc-900 dark:text-white">{profile.district || profile.division || 'Not Set'}</span>
                       </div>

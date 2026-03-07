@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/config';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, arrayUnion, arrayRemove, increment, where, deleteDoc } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
@@ -13,6 +13,7 @@ import { createNotification } from '../utils/notifications';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase/config';
 import { UserPlus, UserMinus } from 'lucide-react';
+import ConfirmationModal from './ConfirmationModal';
 
 interface PostItemProps {
   post: Post;
@@ -104,8 +105,28 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
   const [editBloodGroup, setEditBloodGroup] = useState(post.bloodGroup || '');
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentContent, setEditCommentContent] = useState('');
+  const [showMenu, setShowMenu] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteType, setDeleteType] = useState<'post' | 'comment' | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+  const shouldTruncate = post.content.length > 150 || post.content.split('\n').length > 3;
 
   const bloodGroups: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!showComments) return;
@@ -124,6 +145,56 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
 
     return () => unsubscribe();
   }, [showComments, post.id]);
+
+  const handleDeleteComment = (commentId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!profile) return;
+    setDeleteType('comment');
+    setItemToDelete(commentId);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDelete = () => {
+    if (!profile || (profile.uid !== authorId && profile.role !== 'admin')) return;
+    setDeleteType('post');
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      if (deleteType === 'post') {
+        await deleteDoc(doc(db, 'posts', post.id));
+        toast.success('Post deleted successfully');
+      } else if (deleteType === 'comment' && itemToDelete) {
+        await deleteDoc(doc(db, 'comments', itemToDelete));
+        await updateDoc(doc(db, 'posts', post.id), {
+          commentCount: increment(-1)
+        });
+        toast.success('Comment deleted');
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setDeleteModalOpen(false);
+      setDeleteType(null);
+      setItemToDelete(null);
+    }
+  };
+
+  const handleEditComment = async (commentId: string) => {
+    if (!profile || !editCommentContent.trim()) return;
+
+    try {
+      await updateDoc(doc(db, 'comments', commentId), {
+        content: editCommentContent
+      });
+      setEditingCommentId(null);
+      setEditCommentContent('');
+      toast.success('Comment updated');
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
 
   const handleLike = async () => {
     if (!profile) {
@@ -193,18 +264,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
     }
   };
 
-  const handleDelete = async () => {
-    if (!profile || (profile.uid !== authorId && profile.role !== 'admin')) return;
 
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
-
-    try {
-      await deleteDoc(doc(db, 'posts', post.id));
-      toast.success('Post deleted successfully');
-    } catch (error: any) {
-      toast.error(error.message);
-    }
-  };
 
   const handleShare = async () => {
     const shareText = `Check out this post on BloodTraking!\n\n${post.content}\n\nBy: ${authorName}`;
@@ -381,30 +441,41 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
                 <Edit2 className="h-4 w-4" />
               </button>
             )}
-            <div className="relative group">
-              <button className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full">
+            <div className="relative" ref={menuRef}>
+              <button 
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full"
+              >
                 <MoreVertical className="h-4 w-4 text-zinc-400" />
               </button>
-              <div className="absolute right-0 top-full mt-1 bg-white dark:bg-zinc-800 shadow-xl border border-zinc-100 dark:border-zinc-700 rounded-xl py-1 hidden group-hover:block z-10 min-w-[120px]">
-                {(profile?.uid === authorId || profile?.role === 'admin') && (
-                  <button
-                    onClick={handleDelete}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 w-full text-left"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete Post
-                  </button>
-                )}
-                {profile?.uid !== authorId && (
-                  <button
-                    onClick={handleReport}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 w-full text-left"
-                  >
-                    <AlertTriangle className="h-4 w-4" />
-                    Report Post
-                  </button>
-                )}
-              </div>
+              {showMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-white dark:bg-zinc-800 shadow-xl border border-zinc-100 dark:border-zinc-700 rounded-xl py-1 z-10 min-w-[120px]">
+                  {(profile?.uid === authorId || profile?.role === 'admin') && (
+                    <button
+                      onClick={() => {
+                        handleDelete();
+                        setShowMenu(false);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 w-full text-left"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete Post
+                    </button>
+                  )}
+                  {profile?.uid !== authorId && (
+                    <button
+                      onClick={() => {
+                        handleReport();
+                        setShowMenu(false);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 w-full text-left"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                      Report Post
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -499,9 +570,25 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
           </div>
         ) : (
           <>
-            <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">
-              {renderContentWithHashtags(post.content)}
-            </p>
+            <div className="relative">
+              <p className={cn(
+                "text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap",
+                !isExpanded && shouldTruncate && "line-clamp-3"
+              )}>
+                {renderContentWithHashtags(post.content)}
+              </p>
+              {shouldTruncate && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded(!isExpanded);
+                  }}
+                  className="text-sm font-bold text-blue-600 hover:text-blue-700 mt-1"
+                >
+                  {isExpanded ? 'See less' : 'See more'}
+                </button>
+              )}
+            </div>
 
             {post.phone && (
               <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 w-fit">
@@ -578,7 +665,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
                               <User className="h-4 w-4 text-zinc-400" />
                             )}
                           </Link>
-                          <div className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl rounded-tl-none relative">
+                          <div className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl rounded-tl-none relative group">
                             <div className="flex justify-between items-center mb-1">
                               <div className="flex items-center gap-2">
                                 <Link to={`/user/${comment.authorId || comment.userId}`} className="font-bold text-xs hover:text-red-600 transition-colors">{comment.authorName || comment.userName}</Link>
@@ -622,14 +709,68 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
                               </div>
                               <span className="text-[10px] text-zinc-500">{formatDate(comment.createdAt)}</span>
                             </div>
-                            <p className="text-sm text-zinc-700 dark:text-zinc-300">{comment.content || comment.text}</p>
-                            <button 
-                              onClick={() => setReplyingTo(comment.id)}
-                              className="mt-2 flex items-center gap-1 text-[10px] font-bold text-zinc-500 hover:text-red-600 transition-colors"
-                            >
-                              <Reply className="h-3 w-3" />
-                              Reply
-                            </button>
+
+                            {editingCommentId === comment.id ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  value={editCommentContent}
+                                  onChange={(e) => setEditCommentContent(e.target.value)}
+                                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2 text-xs focus:ring-1 focus:ring-red-600 outline-none resize-none"
+                                  rows={2}
+                                />
+                                <div className="flex gap-2 justify-end">
+                                  <button
+                                    onClick={() => {
+                                      setEditingCommentId(null);
+                                      setEditCommentContent('');
+                                    }}
+                                    className="text-[10px] font-bold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={() => handleEditComment(comment.id)}
+                                    className="text-[10px] font-bold text-red-600 hover:text-red-700"
+                                  >
+                                    Save
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-sm text-zinc-700 dark:text-zinc-300">{comment.content || comment.text}</p>
+                                <div className="flex items-center gap-3 mt-2">
+                                  <button 
+                                    onClick={() => setReplyingTo(comment.id)}
+                                    className="flex items-center gap-1 text-[10px] font-bold text-zinc-500 hover:text-red-600 transition-colors"
+                                  >
+                                    <Reply className="h-3 w-3" />
+                                    Reply
+                                  </button>
+                                  {profile && (profile.uid === (comment.authorId || comment.userId) || profile.role === 'admin') && (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          setEditingCommentId(comment.id);
+                                          setEditCommentContent(comment.content || comment.text);
+                                        }}
+                                        className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-blue-600 transition-colors px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-md"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={(e) => handleDeleteComment(comment.id, e)}
+                                        className="flex items-center gap-1 text-xs font-bold text-zinc-500 hover:text-red-600 transition-colors px-2 py-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                         
@@ -644,7 +785,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
                                   <User className="h-3.5 w-3.5 text-zinc-400" />
                                 )}
                               </Link>
-                              <div className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-2xl rounded-tl-none">
+                              <div className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-2xl rounded-tl-none group">
                                 <div className="flex justify-between items-center mb-1">
                                   <div className="flex items-center gap-2">
                                     <Link to={`/user/${reply.authorId || reply.userId}`} className="font-bold text-[11px] hover:text-red-600 transition-colors">{reply.authorName || reply.userName}</Link>
@@ -687,7 +828,59 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
                                   </div>
                                   <span className="text-[9px] text-zinc-500">{formatDate(reply.createdAt)}</span>
                                 </div>
-                                <p className="text-xs text-zinc-700 dark:text-zinc-300">{reply.content || reply.text}</p>
+
+                                {editingCommentId === reply.id ? (
+                                  <div className="space-y-2">
+                                    <textarea
+                                      value={editCommentContent}
+                                      onChange={(e) => setEditCommentContent(e.target.value)}
+                                      className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2 text-xs focus:ring-1 focus:ring-red-600 outline-none resize-none"
+                                      rows={2}
+                                    />
+                                    <div className="flex gap-2 justify-end">
+                                      <button
+                                        onClick={() => {
+                                          setEditingCommentId(null);
+                                          setEditCommentContent('');
+                                        }}
+                                        className="text-[10px] font-bold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        onClick={() => handleEditComment(reply.id)}
+                                        className="text-[10px] font-bold text-red-600 hover:text-red-700"
+                                      >
+                                        Save
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className="text-xs text-zinc-700 dark:text-zinc-300">{reply.content || reply.text}</p>
+                                    {profile && (profile.uid === (reply.authorId || reply.userId) || profile.role === 'admin') && (
+                                      <div className="flex items-center gap-3 mt-1">
+                                        <button
+                                          onClick={() => {
+                                            setEditingCommentId(reply.id);
+                                            setEditCommentContent(reply.content || reply.text);
+                                          }}
+                                          className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 hover:text-blue-600 transition-colors"
+                                        >
+                                          <Edit2 className="h-2.5 w-2.5" />
+                                          Edit
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteComment(reply.id)}
+                                          className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 hover:text-red-600 transition-colors"
+                                        >
+                                          <Trash2 className="h-2.5 w-2.5" />
+                                          Delete
+                                        </button>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -733,6 +926,18 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
             </motion.div>
           )}
         </AnimatePresence>
+
+        <ConfirmationModal
+          isOpen={deleteModalOpen}
+          onClose={() => setDeleteModalOpen(false)}
+          onConfirm={confirmDelete}
+          title={deleteType === 'post' ? "Delete Post" : "Delete Comment"}
+          message={deleteType === 'post' 
+            ? "Are you sure you want to delete this post? This action cannot be undone." 
+            : "Are you sure you want to delete this comment?"}
+          confirmText="Delete"
+          isDangerous={true}
+        />
       </div>
     </motion.div>
   );

@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../utils/helpers';
 import { motion, AnimatePresence } from 'motion/react';
+import ThemeToggle from './ThemeToggle';
 
 const Navbar = () => {
   const { profile, signOut } = useAuth();
@@ -129,6 +130,7 @@ const Navbar = () => {
               </Link>
             )}
 
+            <ThemeToggle />
             <button
               onClick={toggleLanguage}
               className="px-3 py-1 rounded border border-zinc-200 dark:border-zinc-700 text-xs font-bold uppercase"
@@ -167,6 +169,9 @@ const Navbar = () => {
                 )}
               </Link>
             )}
+            <div className="scale-75 origin-right">
+              <ThemeToggle />
+            </div>
              <button
               onClick={toggleLanguage}
               className="px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 text-xs font-bold uppercase"
