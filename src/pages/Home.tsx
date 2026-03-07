@@ -52,7 +52,8 @@ const Home = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-5xl md:text-7xl font-bold tracking-tighter"
           >
-            {t('hero_title').split(',')[0]}, <span className="text-red-600">{t('hero_title').split(',')[1]}</span>
+            <span className="mr-2">🩸</span>
+            Save a Life, <span className="text-red-600">Donate Blood</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}

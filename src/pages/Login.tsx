@@ -314,27 +314,30 @@ const Login = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <button
             onClick={handleGoogleSignIn}
-            className="flex items-center justify-center gap-2 py-3 border border-zinc-200 dark:border-zinc-700 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
+            className="flex items-center justify-center gap-3 py-4 bg-white dark:bg-zinc-800 border-2 border-zinc-100 dark:border-zinc-700 rounded-2xl hover:border-red-600 dark:hover:border-red-600 transition-all group shadow-sm hover:shadow-md"
           >
-            <Chrome className="h-5 w-5" />
-            <span className="font-medium">{t('google')}</span>
+            <Chrome className="h-6 w-6 text-red-600 group-hover:scale-110 transition-transform" />
+            <span className="font-bold text-zinc-700 dark:text-zinc-200">
+              {isLogin ? t('google') : 'Sign up with Google'}
+            </span>
           </button>
+          
           <button
             onClick={() => setAuthMethod(authMethod === 'email' ? 'phone' : 'email')}
-            className="flex items-center justify-center gap-2 py-3 border border-zinc-200 dark:border-zinc-700 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
+            className="flex items-center justify-center gap-2 py-3 text-sm font-bold text-zinc-500 hover:text-red-600 transition-colors"
           >
             {authMethod === 'email' ? (
               <>
-                <Phone className="h-5 w-5" />
-                <span className="font-medium">{t('phone_login')}</span>
+                <Phone className="h-4 w-4" />
+                <span>{t('phone_login')}</span>
               </>
             ) : (
               <>
-                <Mail className="h-5 w-5" />
-                <span className="font-medium">{t('email_login')}</span>
+                <Mail className="h-4 w-4" />
+                <span>{t('email_login')}</span>
               </>
             )}
           </button>

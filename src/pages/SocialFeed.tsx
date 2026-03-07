@@ -7,6 +7,7 @@ import { motion } from 'motion/react';
 import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, User, MoreVertical, Video, Play, X, Loader2, Upload, Phone, Filter, AlertCircle, Hash } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { Post, BloodGroup } from '../types';
 import { cn } from '../utils/helpers';
 
@@ -16,6 +17,8 @@ import { notifyAllUsers } from '../utils/notifications';
 const SocialFeed = () => {
   const { t } = useTranslation();
   const { profile } = useAuth();
+  const [searchParams] = useSearchParams();
+  const highlightPostId = searchParams.get('id');
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState('');
@@ -42,6 +45,7 @@ const SocialFeed = () => {
     const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snap) => {
       const postList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+      console.log("Fetched posts:", postList.length);
       setPosts(postList);
       setLoading(false);
     }, (error) => {
@@ -51,6 +55,20 @@ const SocialFeed = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (highlightPostId && !loading && posts.length > 0) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        const element = document.getElementById(highlightPostId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-2', 'ring-red-600', 'ring-offset-2');
+          setTimeout(() => element.classList.remove('ring-2', 'ring-red-600', 'ring-offset-2'), 3000);
+        }
+      }, 500);
+    }
+  }, [highlightPostId, loading, posts]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -79,7 +97,7 @@ const SocialFeed = () => {
     setSubmitting(true);
     try {
       const hashtags = extractHashtags(newPostContent);
-      await addDoc(collection(db, 'posts'), {
+      const docRef = await addDoc(collection(db, 'posts'), {
         authorId: profile.uid,
         authorName: profile.name,
         authorPhoto: profile.photoURL || '',
@@ -101,7 +119,7 @@ const SocialFeed = () => {
         'New Community Post',
         `${profile.name} shared a new post: "${newPostContent.substring(0, 30)}..."`,
         'social',
-        '/feed',
+        `/feed?id=${docRef.id}`,
         profile.uid
       );
 
@@ -299,6 +317,7 @@ const SocialFeed = () => {
             .map((post) => (
             <PostItem 
               key={post.id} 
+              id={post.id}
               post={post} 
               profile={profile} 
               onHashtagClick={(tag) => setFilterHashtag(tag)}

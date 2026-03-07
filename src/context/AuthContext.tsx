@@ -6,6 +6,7 @@ import {
   signOut as firebaseSignOut
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { requestNotificationPermission } from '../utils/fcm';
 import { auth, db, googleProvider } from '../firebase/config';
 import { UserProfile } from '../types';
 
@@ -68,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           setProfile(data);
+          requestNotificationPermission(firebaseUser.uid);
         } else {
           // Create a default profile if it doesn't exist (e.g., first time Google login)
           const isAdmin = firebaseUser.email === 'zobaerhasan431@gmail.com' || firebaseUser.uid === 'cWfThoHPOKdviqdkegbyAkDKLjA3';
@@ -118,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await setDoc(docRef, newProfile);
           
           setProfile(newProfile as UserProfile);
+          requestNotificationPermission(firebaseUser.uid);
         }
       } else {
         setProfile(null);
@@ -131,7 +134,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.warn("User closed the sign-in popup.");
+        return;
+      }
       console.error("Google Sign In Error", error);
       throw error;
     }

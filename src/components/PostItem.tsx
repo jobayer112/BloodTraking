@@ -18,9 +18,10 @@ interface PostItemProps {
   post: Post;
   profile: UserProfile | null;
   onHashtagClick?: (tag: string) => void;
+  id?: string;
 }
 
-const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) => {
+const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }) => {
   const { t } = useTranslation();
   const { updateProfileState } = useAuth();
   const [showComments, setShowComments] = useState(false);
@@ -28,52 +29,66 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const isLiked = profile ? post.likes.includes(profile.uid) : false;
-  const isFollowing = profile?.following?.includes(post.authorId || '') || false;
+  const authorId = post.authorId || post.userId;
+  const authorName = post.authorName || post.userName;
+  const authorPhoto = post.authorPhoto || post.userPhoto;
+  const mediaURL = post.mediaURL || post.media;
+  const commentCount = post.commentCount ?? post.commentsCount ?? 0;
+  const likes = post.likes || [];
+  
+  const isLiked = profile ? likes.includes(profile.uid) : false;
+  const isFollowing = profile?.following?.includes(authorId || '') || false;
+
+  const formatDate = (date: any) => {
+    if (!date) return '';
+    if (typeof date === 'string') return new Date(date).toLocaleString();
+    if (date.seconds) return new Date(date.seconds * 1000).toLocaleString();
+    return new Date(date).toLocaleString();
+  };
 
   const handleFollow = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!profile) return toast.error('Please login to follow users');
-    if (!post.authorId || profile.uid === post.authorId) return;
+    if (!authorId || profile.uid === authorId) return;
 
     try {
       const currentUserRef = doc(db, 'users', profile.uid);
-      const targetUserRef = doc(db, 'users', post.authorId);
+      const targetUserRef = doc(db, 'users', authorId);
 
       if (isFollowing) {
         await updateDoc(currentUserRef, {
-          following: arrayRemove(post.authorId)
+          following: arrayRemove(authorId)
         });
         await updateDoc(targetUserRef, {
           followers: arrayRemove(profile.uid)
         });
         updateProfileState({
           ...profile,
-          following: profile.following?.filter(id => id !== post.authorId) || []
+          following: profile.following?.filter(id => id !== authorId) || []
         });
-        toast.success(`Unfollowed ${post.authorName}`);
+        toast.success(`Unfollowed ${authorName}`);
       } else {
         await updateDoc(currentUserRef, {
-          following: arrayUnion(post.authorId)
+          following: arrayUnion(authorId)
         });
         await updateDoc(targetUserRef, {
           followers: arrayUnion(profile.uid)
         });
         updateProfileState({
           ...profile,
-          following: [...(profile.following || []), post.authorId]
+          following: [...(profile.following || []), authorId]
         });
         
         await createNotification(
-          post.authorId,
+          authorId,
           'New Follower',
           `${profile.name} started following you.`,
           'social',
           `/user/${profile.uid}`
         );
         
-        toast.success(`Following ${post.authorName}`);
+        toast.success(`Following ${authorName}`);
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -83,7 +98,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
   const [editPhone, setEditPhone] = useState(post.phone || '');
-  const [editMediaURL, setEditMediaURL] = useState(post.mediaURL || '');
+  const [editMediaURL, setEditMediaURL] = useState(mediaURL || '');
   const [editMediaType, setEditMediaType] = useState(post.mediaType || null);
   const [editPostType, setEditPostType] = useState(post.type);
   const [editBloodGroup, setEditBloodGroup] = useState(post.bloodGroup || '');
@@ -124,13 +139,13 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
         likes: willLike ? arrayUnion(profile.uid) : arrayRemove(profile.uid)
       });
 
-      if (willLike && post.authorId !== profile.uid) {
+      if (willLike && authorId !== profile.uid) {
         await createNotification(
-          post.authorId,
+          authorId,
           'New Like',
           `${profile.name} liked your post.`,
           'social',
-          '/feed'
+          `/feed?id=${post.id}`
         );
       }
     } catch (error) {
@@ -159,13 +174,13 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
         commentCount: increment(1)
       });
 
-      if (post.authorId !== profile.uid) {
+      if (authorId !== profile.uid) {
         await createNotification(
-          post.authorId,
+          authorId,
           'New Comment',
           `${profile.name} ${replyingTo ? 'replied to a comment' : 'commented'} on your post: "${newComment.substring(0, 30)}..."`,
           'social',
-          '/feed'
+          `/feed?id=${post.id}`
         );
       }
 
@@ -179,7 +194,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
   };
 
   const handleDelete = async () => {
-    if (!profile || (profile.uid !== post.authorId && profile.role !== 'admin')) return;
+    if (!profile || (profile.uid !== authorId && profile.role !== 'admin')) return;
 
     if (!window.confirm('Are you sure you want to delete this post?')) return;
 
@@ -192,7 +207,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
   };
 
   const handleShare = async () => {
-    const shareText = `Check out this post on BloodTraking!\n\n${post.content}\n\nBy: ${post.authorName}`;
+    const shareText = `Check out this post on BloodTraking!\n\n${post.content}\n\nBy: ${authorName}`;
     
     if (navigator.share) {
       try {
@@ -297,24 +312,25 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
 
   return (
     <motion.div
+      id={id}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-800 overflow-hidden"
     >
       <div className="p-4 space-y-3">
         <div className="flex justify-between items-start">
-          <Link to={`/user/${post.authorId}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Link to={`/user/${authorId}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="h-9 w-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-              {post.authorPhoto ? (
-                <img src={post.authorPhoto} alt={post.authorName} className="h-full w-full rounded-xl object-cover" />
+              {authorPhoto ? (
+                <img src={authorPhoto} alt={authorName} className="h-full w-full rounded-xl object-cover" />
               ) : (
                 <User className="h-5 w-5 text-zinc-400" />
               )}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="font-bold text-sm text-zinc-900 dark:text-white">{post.authorName}</h4>
-                {profile && profile.uid !== post.authorId && (
+                <h4 className="font-bold text-sm text-zinc-900 dark:text-white">{authorName}</h4>
+                {profile && profile.uid !== authorId && (
                   <button
                     onClick={handleFollow}
                     className={cn(
@@ -344,16 +360,16 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-zinc-500">{new Date(post.createdAt).toLocaleString()}</p>
+              <p className="text-[10px] text-zinc-500">{formatDate(post.createdAt)}</p>
             </div>
           </Link>
           <div className="flex items-center gap-1">
-            {profile?.uid === post.authorId && !isEditing && (
+            {profile?.uid === authorId && !isEditing && (
               <button
                 onClick={() => {
                   setEditContent(post.content);
                   setEditPhone(post.phone || '');
-                  setEditMediaURL(post.mediaURL || '');
+                  setEditMediaURL(mediaURL || '');
                   setEditMediaType(post.mediaType || null);
                   setEditPostType(post.type);
                   setEditBloodGroup(post.bloodGroup || '');
@@ -370,7 +386,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                 <MoreVertical className="h-4 w-4 text-zinc-400" />
               </button>
               <div className="absolute right-0 top-full mt-1 bg-white dark:bg-zinc-800 shadow-xl border border-zinc-100 dark:border-zinc-700 rounded-xl py-1 hidden group-hover:block z-10 min-w-[120px]">
-                {(profile?.uid === post.authorId || profile?.role === 'admin') && (
+                {(profile?.uid === authorId || profile?.role === 'admin') && (
                   <button
                     onClick={handleDelete}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 w-full text-left"
@@ -379,7 +395,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                     Delete Post
                   </button>
                 )}
-                {profile?.uid !== post.authorId && (
+                {profile?.uid !== authorId && (
                   <button
                     onClick={handleReport}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 w-full text-left"
@@ -496,14 +512,14 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
               </div>
             )}
 
-            {post.mediaURL && (
+            {mediaURL && (
               <div className="rounded-xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
                 {post.mediaType === 'video' ? (
                   <div className="aspect-video bg-black relative group cursor-pointer">
-                    <video src={post.mediaURL} className="w-full h-full object-cover" controls />
+                    <video src={mediaURL} className="w-full h-full object-cover" controls />
                   </div>
                 ) : (
-                  <img src={post.mediaURL} alt="Post content" className="w-full h-auto" />
+                  <img src={mediaURL} alt="Post content" className="w-full h-auto" />
                 )}
               </div>
             )}
@@ -519,7 +535,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
             )}
           >
             <Heart className={cn("h-4 w-4", isLiked && "fill-current")} />
-            {post.likes.length}
+            {likes.length}
           </button>
           <button 
             onClick={() => setShowComments(!showComments)}
@@ -529,7 +545,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
             )}
           >
             <MessageSquare className="h-4 w-4" />
-            {post.commentCount}
+            {commentCount}
           </button>
           <button 
             onClick={handleShare}
@@ -555,9 +571,9 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                     {comments.filter(c => !c.parentId).map((comment) => (
                       <div key={comment.id} className="space-y-3">
                         <div className="flex gap-3">
-                          <Link to={`/user/${comment.authorId}`} className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity">
-                            {comment.authorPhoto ? (
-                              <img src={comment.authorPhoto} alt={comment.authorName} className="h-full w-full rounded-lg object-cover" />
+                          <Link to={`/user/${comment.authorId || comment.userId}`} className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity">
+                            {comment.authorPhoto || comment.userPhoto ? (
+                              <img src={comment.authorPhoto || comment.userPhoto} alt={comment.authorName || comment.userName} className="h-full w-full rounded-lg object-cover" />
                             ) : (
                               <User className="h-4 w-4 text-zinc-400" />
                             )}
@@ -565,31 +581,29 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                           <div className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl rounded-tl-none relative">
                             <div className="flex justify-between items-center mb-1">
                               <div className="flex items-center gap-2">
-                                <Link to={`/user/${comment.authorId}`} className="font-bold text-xs hover:text-red-600 transition-colors">{comment.authorName}</Link>
-                                {profile && profile.uid !== comment.authorId && (
+                                <Link to={`/user/${comment.authorId || comment.userId}`} className="font-bold text-xs hover:text-red-600 transition-colors">{comment.authorName || comment.userName}</Link>
+                                {profile && profile.uid !== (comment.authorId || comment.userId) && (
                                   <button
                                     onClick={(e) => {
                                       e.preventDefault();
-                                      // Reuse handleFollow logic or similar
-                                      // For simplicity, I'll just navigate to profile or add a mini follow button
-                                      // But the request said "next to each user's name"
-                                      // I'll implement a small follow button here too
-                                      const isFollowingCommentAuthor = profile.following?.includes(comment.authorId) || false;
+                                      const cAuthorId = comment.authorId || comment.userId;
+                                      const cAuthorName = comment.authorName || comment.userName;
+                                      const isFollowingCommentAuthor = profile.following?.includes(cAuthorId) || false;
                                       
                                       const toggleFollow = async () => {
                                         try {
                                           const currentUserRef = doc(db, 'users', profile.uid);
-                                          const targetUserRef = doc(db, 'users', comment.authorId);
+                                          const targetUserRef = doc(db, 'users', cAuthorId);
                                           if (isFollowingCommentAuthor) {
-                                            await updateDoc(currentUserRef, { following: arrayRemove(comment.authorId) });
+                                            await updateDoc(currentUserRef, { following: arrayRemove(cAuthorId) });
                                             await updateDoc(targetUserRef, { followers: arrayRemove(profile.uid) });
-                                            updateProfileState({ ...profile, following: profile.following?.filter(id => id !== comment.authorId) || [] });
-                                            toast.success(`Unfollowed ${comment.authorName}`);
+                                            updateProfileState({ ...profile, following: profile.following?.filter(id => id !== cAuthorId) || [] });
+                                            toast.success(`Unfollowed ${cAuthorName}`);
                                           } else {
-                                            await updateDoc(currentUserRef, { following: arrayUnion(comment.authorId) });
+                                            await updateDoc(currentUserRef, { following: arrayUnion(cAuthorId) });
                                             await updateDoc(targetUserRef, { followers: arrayUnion(profile.uid) });
-                                            updateProfileState({ ...profile, following: [...(profile.following || []), comment.authorId] });
-                                            toast.success(`Following ${comment.authorName}`);
+                                            updateProfileState({ ...profile, following: [...(profile.following || []), cAuthorId] });
+                                            toast.success(`Following ${cAuthorName}`);
                                           }
                                         } catch (err: any) { toast.error(err.message); }
                                       };
@@ -597,18 +611,18 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                                     }}
                                     className={cn(
                                       "text-[8px] font-bold px-1.5 py-0.5 rounded transition-colors",
-                                      profile.following?.includes(comment.authorId)
+                                      profile.following?.includes(comment.authorId || comment.userId)
                                         ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-500"
                                         : "bg-red-50 dark:bg-red-900/20 text-red-600"
                                     )}
                                   >
-                                    {profile.following?.includes(comment.authorId) ? 'Following' : 'Follow'}
+                                    {profile.following?.includes(comment.authorId || comment.userId) ? 'Following' : 'Follow'}
                                   </button>
                                 )}
                               </div>
-                              <span className="text-[10px] text-zinc-500">{new Date(comment.createdAt).toLocaleDateString()}</span>
+                              <span className="text-[10px] text-zinc-500">{formatDate(comment.createdAt)}</span>
                             </div>
-                            <p className="text-sm text-zinc-700 dark:text-zinc-300">{comment.content}</p>
+                            <p className="text-sm text-zinc-700 dark:text-zinc-300">{comment.content || comment.text}</p>
                             <button 
                               onClick={() => setReplyingTo(comment.id)}
                               className="mt-2 flex items-center gap-1 text-[10px] font-bold text-zinc-500 hover:text-red-600 transition-colors"
@@ -623,9 +637,9 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                         <div className="ml-11 space-y-3 border-l-2 border-zinc-100 dark:border-zinc-800 pl-4">
                           {comments.filter(c => c.parentId === comment.id).map((reply) => (
                             <div key={reply.id} className="flex gap-3">
-                              <Link to={`/user/${reply.authorId}`} className="h-7 w-7 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity">
-                                {reply.authorPhoto ? (
-                                  <img src={reply.authorPhoto} alt={reply.authorName} className="h-full w-full rounded-lg object-cover" />
+                              <Link to={`/user/${reply.authorId || reply.userId}`} className="h-7 w-7 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity">
+                                {reply.authorPhoto || reply.userPhoto ? (
+                                  <img src={reply.authorPhoto || reply.userPhoto} alt={reply.authorName || reply.userName} className="h-full w-full rounded-lg object-cover" />
                                 ) : (
                                   <User className="h-3.5 w-3.5 text-zinc-400" />
                                 )}
@@ -633,26 +647,28 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                               <div className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-2xl rounded-tl-none">
                                 <div className="flex justify-between items-center mb-1">
                                   <div className="flex items-center gap-2">
-                                    <Link to={`/user/${reply.authorId}`} className="font-bold text-[11px] hover:text-red-600 transition-colors">{reply.authorName}</Link>
-                                    {profile && profile.uid !== reply.authorId && (
+                                    <Link to={`/user/${reply.authorId || reply.userId}`} className="font-bold text-[11px] hover:text-red-600 transition-colors">{reply.authorName || reply.userName}</Link>
+                                    {profile && profile.uid !== (reply.authorId || reply.userId) && (
                                       <button
                                         onClick={(e) => {
                                           e.preventDefault();
-                                          const isFollowingReplyAuthor = profile.following?.includes(reply.authorId) || false;
+                                          const rAuthorId = reply.authorId || reply.userId;
+                                          const rAuthorName = reply.authorName || reply.userName;
+                                          const isFollowingReplyAuthor = profile.following?.includes(rAuthorId) || false;
                                           const toggleFollow = async () => {
                                             try {
                                               const currentUserRef = doc(db, 'users', profile.uid);
-                                              const targetUserRef = doc(db, 'users', reply.authorId);
+                                              const targetUserRef = doc(db, 'users', rAuthorId);
                                               if (isFollowingReplyAuthor) {
-                                                await updateDoc(currentUserRef, { following: arrayRemove(reply.authorId) });
+                                                await updateDoc(currentUserRef, { following: arrayRemove(rAuthorId) });
                                                 await updateDoc(targetUserRef, { followers: arrayRemove(profile.uid) });
-                                                updateProfileState({ ...profile, following: profile.following?.filter(id => id !== reply.authorId) || [] });
-                                                toast.success(`Unfollowed ${reply.authorName}`);
+                                                updateProfileState({ ...profile, following: profile.following?.filter(id => id !== rAuthorId) || [] });
+                                                toast.success(`Unfollowed ${rAuthorName}`);
                                               } else {
-                                                await updateDoc(currentUserRef, { following: arrayUnion(reply.authorId) });
+                                                await updateDoc(currentUserRef, { following: arrayUnion(rAuthorId) });
                                                 await updateDoc(targetUserRef, { followers: arrayUnion(profile.uid) });
-                                                updateProfileState({ ...profile, following: [...(profile.following || []), reply.authorId] });
-                                                toast.success(`Following ${reply.authorName}`);
+                                                updateProfileState({ ...profile, following: [...(profile.following || []), rAuthorId] });
+                                                toast.success(`Following ${rAuthorName}`);
                                               }
                                             } catch (err: any) { toast.error(err.message); }
                                           };
@@ -660,18 +676,18 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                                         }}
                                         className={cn(
                                           "text-[7px] font-bold px-1 py-0.5 rounded transition-colors",
-                                          profile.following?.includes(reply.authorId)
+                                          profile.following?.includes(reply.authorId || reply.userId)
                                             ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-500"
                                             : "bg-red-50 dark:bg-red-900/20 text-red-600"
                                         )}
                                       >
-                                        {profile.following?.includes(reply.authorId) ? 'Following' : 'Follow'}
+                                        {profile.following?.includes(reply.authorId || reply.userId) ? 'Following' : 'Follow'}
                                       </button>
                                     )}
                                   </div>
-                                  <span className="text-[9px] text-zinc-500">{new Date(reply.createdAt).toLocaleDateString()}</span>
+                                  <span className="text-[9px] text-zinc-500">{formatDate(reply.createdAt)}</span>
                                 </div>
-                                <p className="text-xs text-zinc-700 dark:text-zinc-300">{reply.content}</p>
+                                <p className="text-xs text-zinc-700 dark:text-zinc-300">{reply.content || reply.text}</p>
                               </div>
                             </div>
                           ))}
@@ -689,7 +705,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick }) =>
                   {replyingTo && (
                     <div className="flex items-center justify-between px-3 py-1 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
                       <p className="text-[10px] text-zinc-500">
-                        Replying to <span className="font-bold">{comments.find(c => c.id === replyingTo)?.authorName}</span>
+                        Replying to <span className="font-bold">{comments.find(c => c.id === replyingTo)?.authorName || comments.find(c => c.id === replyingTo)?.userName}</span>
                       </p>
                       <button onClick={() => setReplyingTo(null)} className="text-zinc-400 hover:text-red-600">
                         <X className="h-3 w-3" />

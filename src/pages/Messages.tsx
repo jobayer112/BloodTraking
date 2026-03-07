@@ -4,16 +4,24 @@ import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot, orderBy, doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, User, Search, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ChatWindow from '../components/ChatWindow';
 
 const Messages = () => {
   const { user, profile } = useAuth();
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(searchParams.get('room'));
   const [roomParticipants, setRoomParticipants] = useState<{ [key: string]: any }>({});
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const roomId = searchParams.get('room');
+    if (roomId) {
+      setSelectedRoomId(roomId);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user) return;
@@ -129,20 +137,28 @@ const Messages = () => {
       {/* Chat Window */}
       <div className={`flex-1 flex flex-col ${!selectedRoomId ? 'hidden md:flex' : 'flex'}`}>
         {selectedRoomId ? (
-          <div className="h-full flex flex-col">
-            <div className="md:hidden p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
-              <button onClick={() => setSelectedRoomId(null)} className="p-2 -ml-2">
-                <ArrowLeft className="h-5 w-5 text-zinc-400" />
-              </button>
-              <div className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                {roomParticipants[rooms.find(r => r.id === selectedRoomId)?.participants.find((id: string) => id !== user.uid)]?.photoURL ? (
-                  <img src={roomParticipants[rooms.find(r => r.id === selectedRoomId)?.participants.find((id: string) => id !== user.uid)]?.photoURL} className="h-full w-full object-cover" />
-                ) : <User className="h-4 w-4 m-2 text-zinc-400" />}
+          (() => {
+            const selectedRoom = rooms.find(r => r.id === selectedRoomId);
+            const otherParticipantId = selectedRoom?.participants?.find((id: string) => id !== user.uid);
+            const otherParticipant = otherParticipantId ? roomParticipants[otherParticipantId] : null;
+
+            return (
+              <div className="h-full flex flex-col">
+                <div className="md:hidden p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+                  <button onClick={() => setSelectedRoomId(null)} className="p-2 -ml-2">
+                    <ArrowLeft className="h-5 w-5 text-zinc-400" />
+                  </button>
+                  <div className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                    {otherParticipant?.photoURL ? (
+                      <img src={otherParticipant.photoURL} className="h-full w-full object-cover" />
+                    ) : <User className="h-4 w-4 m-2 text-zinc-400" />}
+                  </div>
+                  <span className="font-bold text-sm">{otherParticipant?.name || 'Loading...'}</span>
+                </div>
+                <ChatWindow roomId={selectedRoomId} />
               </div>
-              <span className="font-bold text-sm">{roomParticipants[rooms.find(r => r.id === selectedRoomId)?.participants.find((id: string) => id !== user.uid)]?.name}</span>
-            </div>
-            <ChatWindow roomId={selectedRoomId} />
-          </div>
+            );
+          })()
         ) : (
           <div className="flex-1 flex flex-center justify-center items-center bg-zinc-50/50 dark:bg-zinc-800/10">
             <div className="text-center space-y-4">

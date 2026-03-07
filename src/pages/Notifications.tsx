@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase/config';
 import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
@@ -10,8 +11,23 @@ import { cn } from '../utils/helpers';
 
 const Notifications = () => {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const getTimestamp = (date: any) => {
+    if (!date) return 0;
+    if (typeof date === 'string') return new Date(date).getTime();
+    if (date.seconds) return date.seconds * 1000;
+    return new Date(date).getTime();
+  };
+
+  const formatDate = (date: any) => {
+    if (!date) return '';
+    if (typeof date === 'string') return new Date(date).toLocaleDateString();
+    if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString();
+    return new Date(date).toLocaleDateString();
+  };
 
   useEffect(() => {
     if (!profile) return;
@@ -28,7 +44,7 @@ const Notifications = () => {
         ...doc.data()
       } as Notification));
       // Sort in memory to avoid composite index requirement
-      notificationList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      notificationList.sort((a, b) => getTimestamp(b.createdAt) - getTimestamp(a.createdAt));
       setNotifications(notificationList);
       setLoading(false);
     }, (error) => {
@@ -43,7 +59,7 @@ const Notifications = () => {
     try {
       await updateDoc(doc(db, 'notifications', id), { isRead: true });
     } catch (error) {
-      toast.error('Failed to update notification');
+      console.error("Error marking notification as read:", error);
     }
   };
 
@@ -53,6 +69,16 @@ const Notifications = () => {
       toast.success('Notification deleted');
     } catch (error) {
       toast.error('Failed to delete notification');
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.isRead) {
+      markAsRead(notification.id);
+    }
+    
+    if (notification.link) {
+      navigate(notification.link);
     }
   };
 
@@ -90,8 +116,10 @@ const Notifications = () => {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.05 }}
+              onClick={() => handleNotificationClick(notification)}
               className={cn(
-                "p-6 rounded-3xl border transition-all flex gap-4 items-start",
+                "p-6 rounded-3xl border transition-all flex gap-4 items-start relative group",
+                notification.link ? "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50" : "",
                 notification.isRead 
                   ? "bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 opacity-70" 
                   : "bg-red-50/30 dark:bg-red-900/5 border-red-100 dark:border-red-900/20 shadow-sm"
@@ -106,20 +134,26 @@ const Notifications = () => {
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-bold text-zinc-400 uppercase flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {new Date(notification.createdAt).toLocaleDateString()}
+                      {formatDate(notification.createdAt)}
                     </span>
                     <button 
-                      onClick={() => deleteNotification(notification.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNotification(notification.id);
+                      }}
                       className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-red-600 transition-colors"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">{notification.body}</p>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">{notification.body || notification.message}</p>
                 {!notification.isRead && (
                   <button 
-                    onClick={() => markAsRead(notification.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markAsRead(notification.id);
+                    }}
                     className="text-xs font-bold text-red-600 flex items-center gap-1 pt-2 hover:underline"
                   >
                     <Check className="h-3 w-3" />

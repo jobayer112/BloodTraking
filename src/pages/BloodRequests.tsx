@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Plus, MapPin, Droplets, Calendar, Phone, AlertCircle, Clock, CheckCircle2, X, Trash2, Search, Share2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn } from '../utils/helpers';
 import { BloodRequest } from '../types';
 import { notifyMatchingDonors, createNotification } from '../utils/notifications';
@@ -15,6 +15,8 @@ const BloodRequests = () => {
   const { t } = useTranslation();
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const highlightRequestId = searchParams.get('id');
   const [requests, setRequests] = useState<BloodRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -43,6 +45,19 @@ const BloodRequests = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (highlightRequestId && !loading && requests.length > 0) {
+      setTimeout(() => {
+        const element = document.getElementById(highlightRequestId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-2', 'ring-red-600', 'ring-offset-2');
+          setTimeout(() => element.classList.remove('ring-2', 'ring-red-600', 'ring-offset-2'), 3000);
+        }
+      }, 500);
+    }
+  }, [highlightRequestId, loading, requests]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,19 +185,28 @@ const BloodRequests = () => {
           {filteredRequests.map((request, index) => (
             <motion.div
               key={request.id}
+              id={request.id}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.05 }}
               className={cn(
                 "bg-white dark:bg-zinc-900 p-6 rounded-3xl border shadow-sm space-y-4",
-                request.emergencyLevel === 'critical' ? "border-red-200 dark:border-red-900/30 bg-red-50/30 dark:bg-red-900/5" : "border-zinc-100 dark:border-zinc-800"
+                request.emergencyLevel === 'critical' 
+                  ? "border-red-200 dark:border-red-900/30 bg-red-50/30 dark:bg-red-900/5" 
+                  : request.emergencyLevel === 'urgent'
+                    ? "border-amber-200 dark:border-amber-900/30 bg-amber-50/30 dark:bg-amber-900/5"
+                    : "border-zinc-100 dark:border-zinc-800"
               )}
             >
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-2">
                   <div className={cn(
                     "h-10 w-10 rounded-xl flex items-center justify-center font-bold text-lg",
-                    request.emergencyLevel === 'critical' ? "bg-red-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-red-600"
+                    request.emergencyLevel === 'critical' 
+                      ? "bg-red-600 text-white" 
+                      : request.emergencyLevel === 'urgent'
+                        ? "bg-amber-500 text-white"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-red-600"
                   )}>
                     {request.bloodGroup}
                   </div>

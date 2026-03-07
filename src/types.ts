@@ -15,6 +15,7 @@ export interface UserProfile {
   lastDonationDate?: string;
   isVerified: boolean;
   isBanned?: boolean;
+  fcmToken?: string;
   weight?: number;
   height?: string;
   medicalHistory?: string;
@@ -29,6 +30,7 @@ export interface UserProfile {
   shortId?: string;
   following?: string[];
   followers?: string[];
+  bookmarks?: string[];
 }
 
 export interface BloodRequest {

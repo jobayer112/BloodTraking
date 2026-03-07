@@ -5,12 +5,14 @@ import { getMessaging } from "firebase/messaging";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAFWHlevE6Qb9iwYBNlsKwhZV8Oqt6x180",
-  authDomain: "bizsight-o8tvx.firebaseapp.com",
-  projectId: "bizsight-o8tvx",
-  storageBucket: "bizsight-o8tvx.firebasestorage.app",
-  messagingSenderId: "21467871849",
-  appId: "1:21467871849:web:6e2ad8954756a1fe4480f8"
+  apiKey: "AIzaSyBfbLiTNuU0FFTgAosqQ5GQKPAMDfuyo3w",
+  authDomain: "register-7df95.firebaseapp.com",
+  databaseURL: "https://register-7df95-default-rtdb.firebaseio.com",
+  projectId: "register-7df95",
+  storageBucket: "register-7df95.firebasestorage.app",
+  messagingSenderId: "672996110076",
+  appId: "1:672996110076:web:c86089000750cdbf973179",
+  measurementId: "G-N1TQTWV3MZ"
 };
 
 const app = initializeApp(firebaseConfig);

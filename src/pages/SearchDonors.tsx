@@ -9,10 +9,11 @@ import {
   addDoc, 
   serverTimestamp, 
   setDoc, 
-  doc 
+  doc,
+  updateDoc
 } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search as SearchIcon, MapPin, Droplets, Phone, User, CheckCircle, LayoutGrid, Map as MapIcon, X, Share2, Calendar, Weight, Ruler, UserPlus, MessageSquare, Navigation } from 'lucide-react';
+import { Search as SearchIcon, MapPin, Droplets, Phone, User, CheckCircle, LayoutGrid, Map as MapIcon, X, Share2, Calendar, Weight, Ruler, UserPlus, MessageSquare, Navigation, Bookmark, ChevronDown, ChevronUp } from 'lucide-react';
 import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn, canDonate, getBadge, calculateDistance } from '../utils/helpers';
 import { UserProfile } from '../types';
 import DonorMap from '../components/DonorMap';
@@ -39,6 +40,7 @@ const SearchDonors = () => {
     radius: 0, // 0 means no radius filter
     sortByProximity: false,
   });
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const { profile } = useAuth();
 
   const fetchDonors = async () => {
@@ -173,6 +175,29 @@ END:VCARD`;
     toast.success('Contact file generated');
   };
 
+  const toggleBookmark = async (donorUid: string) => {
+    if (!profile) {
+      toast.error('Please login to bookmark donors');
+      return;
+    }
+    
+    try {
+      const userRef = doc(db, 'users', profile.uid);
+      const currentBookmarks = profile.bookmarks || [];
+      const isBookmarked = currentBookmarks.includes(donorUid);
+      
+      const newBookmarks = isBookmarked 
+        ? currentBookmarks.filter(uid => uid !== donorUid)
+        : [...currentBookmarks, donorUid];
+        
+      await updateDoc(userRef, { bookmarks: newBookmarks });
+      toast.success(isBookmarked ? 'Removed from bookmarks' : 'Added to bookmarks');
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+      toast.error('Failed to update bookmarks');
+    }
+  };
+
   const startChat = async (donor: UserProfile) => {
     if (!profile) {
       toast.error('Please login to message donors');
@@ -194,7 +219,7 @@ END:VCARD`;
       let existingRoom = snapshot.docs.find(doc => doc.data().participants.includes(donor.uid));
 
       if (existingRoom) {
-        navigate('/messages');
+        navigate(`/messages?room=${existingRoom.id}`);
         return;
       }
 
@@ -210,7 +235,7 @@ END:VCARD`;
         }
       });
 
-      navigate('/messages');
+      navigate(`/messages?room=${roomId}`);
     } catch (error) {
       console.error("Error starting chat:", error);
       toast.error('Failed to start conversation');
@@ -275,99 +300,109 @@ END:VCARD`;
 
       {/* Filters */}
       <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 items-end">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('blood_group')}</label>
-            <select
-              value={filters.bloodGroup}
-              onChange={(e) => setFilters({ ...filters, bloodGroup: e.target.value })}
-              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
-            >
-              <option value="">All</option>
-              {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('division')}</label>
-            <select
-              value={filters.division}
-              onChange={(e) => setFilters({ ...filters, division: e.target.value, district: '' })}
-              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
-            >
-              <option value="">All</option>
-              {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('district')}</label>
-            <select
-              value={filters.district}
-              onChange={(e) => setFilters({ ...filters, district: e.target.value })}
-              disabled={!filters.division}
-              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 disabled:opacity-50 text-sm"
-            >
-              <option value="">All</option>
-              {availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Availability</label>
-            <select
-              value={filters.availability}
-              onChange={(e) => setFilters({ ...filters, availability: e.target.value })}
-              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
-            >
-              <option value="all">All</option>
-              <option value="available">Available Only</option>
-              <option value="unavailable">Unavailable</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Donation Status</label>
-            <select
-              value={filters.donationStatus}
-              onChange={(e) => setFilters({ ...filters, donationStatus: e.target.value })}
-              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
-            >
-              <option value="all">Any Time</option>
-              <option value="ready">Ready to Donate (4+ months)</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Radius (km)</label>
-            <select
-              value={filters.radius}
-              onChange={(e) => setFilters({ ...filters, radius: Number(e.target.value) })}
-              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
-            >
-              <option value={0}>Any</option>
-              <option value={5}>5 km</option>
-              <option value={10}>10 km</option>
-              <option value={20}>20 km</option>
-              <option value={50}>50 km</option>
-            </select>
-          </div>
-          {profile && (
-            <div className="space-y-1 flex flex-col justify-end pb-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.sortByProximity}
-                  onChange={(e) => setFilters({ ...filters, sortByProximity: e.target.checked })}
-                  className="rounded text-red-600 focus:ring-red-600 bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
-                />
-                <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Sort by Proximity</span>
-              </label>
+        <button 
+          onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+          className="w-full flex justify-between items-center text-zinc-900 dark:text-white font-bold"
+        >
+          <span>Filters</span>
+          {isFiltersOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+        </button>
+        
+        {isFiltersOpen && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 items-end pt-4 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('blood_group')}</label>
+              <select
+                value={filters.bloodGroup}
+                onChange={(e) => setFilters({ ...filters, bloodGroup: e.target.value })}
+                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+              >
+                <option value="">All</option>
+                {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
             </div>
-          )}
-          <button
-            onClick={fetchDonors}
-            className="py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2 text-sm"
-          >
-            <SearchIcon className="h-4 w-4" />
-            {t('find_donor')}
-          </button>
-        </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('division')}</label>
+              <select
+                value={filters.division}
+                onChange={(e) => setFilters({ ...filters, division: e.target.value, district: '' })}
+                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+              >
+                <option value="">All</option>
+                {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('district')}</label>
+              <select
+                value={filters.district}
+                onChange={(e) => setFilters({ ...filters, district: e.target.value })}
+                disabled={!filters.division}
+                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 disabled:opacity-50 text-sm"
+              >
+                <option value="">All</option>
+                {availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Availability</label>
+              <select
+                value={filters.availability}
+                onChange={(e) => setFilters({ ...filters, availability: e.target.value })}
+                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+              >
+                <option value="all">All</option>
+                <option value="available">Available Only</option>
+                <option value="unavailable">Unavailable</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Donation Status</label>
+              <select
+                value={filters.donationStatus}
+                onChange={(e) => setFilters({ ...filters, donationStatus: e.target.value })}
+                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+              >
+                <option value="all">Any Time</option>
+                <option value="ready">Ready to Donate (4+ months)</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Radius (km)</label>
+              <select
+                value={filters.radius}
+                onChange={(e) => setFilters({ ...filters, radius: Number(e.target.value) })}
+                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+              >
+                <option value={0}>Any</option>
+                <option value={5}>5 km</option>
+                <option value={10}>10 km</option>
+                <option value={20}>20 km</option>
+                <option value={50}>50 km</option>
+              </select>
+            </div>
+            {profile && (
+              <div className="space-y-1 flex flex-col justify-end pb-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filters.sortByProximity}
+                    onChange={(e) => setFilters({ ...filters, sortByProximity: e.target.checked })}
+                    className="rounded text-red-600 focus:ring-red-600 bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                  />
+                  <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Sort by Proximity</span>
+                </label>
+              </div>
+            )}
+            <button
+              onClick={fetchDonors}
+              className="py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2 text-sm"
+            >
+              <SearchIcon className="h-4 w-4" />
+              {t('find_donor')}
+            </button>
+          </div>
+        )}
 
         <div className="flex justify-center border-t border-zinc-100 dark:border-zinc-800 pt-4">
           <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
@@ -485,6 +520,21 @@ END:VCARD`;
               </div>
 
                 <div className="flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleBookmark(donor.uid);
+                    }}
+                    className={cn(
+                      "p-2.5 rounded-xl transition-all",
+                      profile?.bookmarks?.includes(donor.uid)
+                        ? "bg-red-100 dark:bg-red-900/20 text-red-600"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    )}
+                    title="Bookmark Donor"
+                  >
+                    <Bookmark className={cn("h-4 w-4", profile?.bookmarks?.includes(donor.uid) && "fill-current")} />
+                  </button>
                   <a
                     href={`tel:${donor.phone}`}
                     onClick={(e) => e.stopPropagation()}

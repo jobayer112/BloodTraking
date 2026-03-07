@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquare, Send, X, Bot, User, Sparkles, Loader2, MessageCircle } from 'lucide-react';
+import { MessageSquare, Send, X, Bot, User, Sparkles, Loader2, MessageCircle, Trash2 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
@@ -9,9 +9,18 @@ import { cn } from '../utils/helpers';
 const AIChatbot = () => {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<{ role: 'user' | 'bot', text: string }[]>([
-    { role: 'bot', text: 'Assalamuallaikum! I am your BloodTraking AI assistant. I can help you with blood donation info or answer any other questions you have. How can I assist you today?' }
-  ]);
+  const [messages, setMessages] = useState<{ role: 'user' | 'bot', text: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('ai_chat_history');
+      return saved ? JSON.parse(saved) : [
+        { role: 'bot', text: 'Assalamuallaikum! I am your BloodTraking AI assistant. I can help you find blood donors, explain donation eligibility, provide health tips, or answer any other questions you might have. How can I assist you today?' }
+      ];
+    } catch (e) {
+      return [
+        { role: 'bot', text: 'Assalamuallaikum! I am your BloodTraking AI assistant. I can help you find blood donors, explain donation eligibility, provide health tips, or answer any other questions you might have. How can I assist you today?' }
+      ];
+    }
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -22,6 +31,7 @@ const AIChatbot = () => {
 
   useEffect(() => {
     scrollToBottom();
+    localStorage.setItem('ai_chat_history', JSON.stringify(messages));
   }, [messages]);
 
   useEffect(() => {
@@ -29,6 +39,14 @@ const AIChatbot = () => {
       setTimeout(scrollToBottom, 100);
     }
   }, [isOpen]);
+
+  const clearChat = () => {
+    const initial: { role: 'user' | 'bot', text: string }[] = [
+      { role: 'bot', text: 'Assalamuallaikum! I am your BloodTraking AI assistant. I can help you find blood donors, explain donation eligibility, provide health tips, or answer any other questions you might have. How can I assist you today?' }
+    ];
+    setMessages(initial);
+    localStorage.removeItem('ai_chat_history');
+  };
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -78,114 +96,126 @@ const AIChatbot = () => {
               exit={{ opacity: 0, y: '100%' }}
               className="fixed inset-0 sm:absolute sm:inset-auto sm:bottom-20 sm:right-0 w-full sm:w-[420px] h-full sm:h-[600px] sm:max-h-[calc(100vh-120px)] bg-white dark:bg-zinc-900 sm:rounded-[24px] shadow-2xl border-t sm:border border-zinc-100 dark:border-zinc-800 flex flex-col overflow-hidden z-[10000]"
             >
-            {/* Header */}
-            <div className="p-4 pt-[calc(env(safe-area-inset-top)+1rem)] sm:pt-4 bg-red-600 text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 bg-white/20 rounded-2xl flex items-center justify-center">
-                  <Bot className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="font-bold text-sm">BloodTraking AI</div>
-                  <div className="text-[10px] opacity-80 flex items-center gap-1">
-                    <Sparkles className="h-2 w-2" /> Online
+              {/* Header */}
+              <div className="p-4 pt-[calc(env(safe-area-inset-top)+1rem)] sm:pt-4 bg-red-600 text-white flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-white/20 rounded-2xl flex items-center justify-center">
+                    <Bot className="h-6 w-6" />
                   </div>
+                  <div>
+                    <div className="font-bold text-sm">BloodTraking AI</div>
+                    <div className="text-[10px] opacity-80 flex items-center gap-1">
+                      <Sparkles className="h-2 w-2" /> Online
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={clearChat}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    title="Clear Chat"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                  <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <X className="h-5 w-5" />
+                  </button>
                 </div>
               </div>
-              <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth overscroll-contain">
-              {messages.map((msg, i) => (
-                <div key={i} className={cn("flex gap-3 max-w-[95%] sm:max-w-[90%]", msg.role === 'user' ? "ml-auto flex-row-reverse" : "")}>
-                  <div className={cn(
-                    "h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0",
-                    msg.role === 'bot' ? "bg-red-50 dark:bg-red-900/20 text-red-600" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
-                  )}>
-                    {msg.role === 'bot' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
-                  </div>
-                  <div className={cn(
-                    "p-3 rounded-2xl text-sm break-words",
-                    msg.role === 'user' 
-                      ? 'bg-red-600 text-white rounded-tr-none' 
-                      : 'bg-zinc-50 dark:bg-zinc-800/50 text-zinc-900 dark:text-zinc-100 rounded-tl-none'
-                  )}>
-                    <div className="markdown-body prose prose-sm dark:prose-invert max-w-none overflow-hidden">
-                      <Markdown>{msg.text}</Markdown>
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth overscroll-contain">
+                {messages.map((msg, i) => (
+                  <div key={i} className={cn("flex gap-3 max-w-[95%] sm:max-w-[90%]", msg.role === 'user' ? "ml-auto flex-row-reverse" : "")}>
+                    <div className={cn(
+                      "h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0",
+                      msg.role === 'bot' ? "bg-red-50 dark:bg-red-900/20 text-red-600" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                    )}>
+                      {msg.role === 'bot' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                    </div>
+                    <div className={cn(
+                      "p-3 rounded-2xl text-sm break-words",
+                      msg.role === 'user' 
+                        ? 'bg-red-600 text-white rounded-tr-none' 
+                        : 'bg-zinc-50 dark:bg-zinc-800/50 text-zinc-900 dark:text-zinc-100 rounded-tl-none'
+                    )}>
+                      <div className="markdown-body prose prose-sm dark:prose-invert max-w-none overflow-hidden">
+                        <Markdown>{msg.text}</Markdown>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-              {loading && (
-                <div className="flex gap-3">
-                  <div className="h-8 w-8 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 flex items-center justify-center">
-                    <Bot className="h-5 w-5" />
-                  </div>
-                  <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl rounded-tl-none flex items-center gap-2">
-                    <div className="flex gap-1">
-                      <motion.span
-                        animate={{ opacity: [0.4, 1, 0.4] }}
-                        transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
-                        className="h-1.5 w-1.5 bg-red-600 rounded-full"
-                      />
-                      <motion.span
-                        animate={{ opacity: [0.4, 1, 0.4] }}
-                        transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
-                        className="h-1.5 w-1.5 bg-red-600 rounded-full"
-                      />
-                      <motion.span
-                        animate={{ opacity: [0.4, 1, 0.4] }}
-                        transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
-                        className="h-1.5 w-1.5 bg-red-600 rounded-full"
-                      />
+                ))}
+                {loading && (
+                  <div className="flex gap-3">
+                    <div className="h-8 w-8 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 flex items-center justify-center">
+                      <Bot className="h-5 w-5" />
                     </div>
-                    <span className="text-xs text-zinc-500 font-medium italic">typing...</span>
+                    <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl rounded-tl-none flex items-center gap-2">
+                      <div className="flex gap-1">
+                        <motion.span
+                          animate={{ opacity: [0.4, 1, 0.4] }}
+                          transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
+                          className="h-1.5 w-1.5 bg-red-600 rounded-full"
+                        />
+                        <motion.span
+                          animate={{ opacity: [0.4, 1, 0.4] }}
+                          transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+                          className="h-1.5 w-1.5 bg-red-600 rounded-full"
+                        />
+                        <motion.span
+                          animate={{ opacity: [0.4, 1, 0.4] }}
+                          transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
+                          className="h-1.5 w-1.5 bg-red-600 rounded-full"
+                        />
+                      </div>
+                      <span className="text-xs text-zinc-500 font-medium italic">typing...</span>
+                    </div>
                   </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
 
-            {/* Input */}
-            <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:pb-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 shrink-0">
-              <form 
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSend();
-                }}
-                className="flex gap-2 items-center"
-              >
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask anything..."
-                  className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-red-600 min-w-0"
-                  autoFocus
-                  inputMode="text"
-                  enterKeyHint="send"
-                />
-                <button
-                  type="submit"
-                  disabled={loading || !input.trim()}
-                  className="p-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all disabled:opacity-50 shrink-0"
+              {/* Input */}
+              <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:pb-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 shrink-0">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSend();
+                  }}
+                  className="flex gap-2 items-center"
                 >
-                  <Send className="h-5 w-5" />
-                </button>
-              </form>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Ask anything..."
+                    className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-red-600 min-w-0"
+                    autoFocus
+                    inputMode="text"
+                    enterKeyHint="send"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading || !input.trim()}
+                    className="p-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all disabled:opacity-50 shrink-0"
+                  >
+                    <Send className="h-5 w-5" />
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="h-12 w-12 sm:h-14 sm:w-14 bg-red-600 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:bg-red-700 transition-all"
+        className={cn(
+          "h-12 w-12 sm:h-14 sm:w-14 bg-red-600 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:bg-red-700 transition-all",
+          isOpen ? "hidden sm:flex" : "flex"
+        )}
       >
         {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </motion.button>

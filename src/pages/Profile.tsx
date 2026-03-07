@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth, db, storage } from '../firebase/config';
-import { doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
 import { motion } from 'motion/react';
-import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera, Loader2, Share2, QrCode } from 'lucide-react';
+import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera, Loader2, Share2, QrCode, MessageSquare, Sparkles } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import { GoogleGenAI } from '@google/genai';
 import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn, canDonate, getBadge } from '../utils/helpers';
 
 const Profile = () => {
@@ -17,6 +18,9 @@ const Profile = () => {
   const { profile, updateProfileState } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [generatingAvatar, setGeneratingAvatar] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -88,40 +92,164 @@ const Profile = () => {
       return;
     }
 
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image size should be less than 2MB');
+    // Validate file size (max 5MB for mobile compatibility)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
       return;
     }
 
     setUploading(true);
     try {
-      const storageRef = ref(storage, `profiles/${profile.uid}/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      // Use a clean filename to avoid mobile character issues
+      const extension = file.name.split('.').pop();
+      const fileName = `profile_${profile.uid}_${Date.now()}.${extension}`;
+      const storageRef = ref(storage, `profiles/${profile.uid}/${fileName}`);
       
-      // Update Firestore immediately
-      const userRef = doc(db, 'users', profile.uid);
-      await updateDoc(userRef, { 
-        photoURL: downloadURL,
-        updatedAt: new Date().toISOString()
+      // OPTIMISTIC UPDATE: Show image immediately
+      const objectUrl = URL.createObjectURL(file);
+      setFormData(prev => ({ ...prev, photoURL: objectUrl }));
+      updateProfileState({ ...profile, photoURL: objectUrl } as any);
+      
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          // Progress monitoring if needed
+        }, 
+        (error) => {
+          console.error("Upload error state:", error);
+          toast.error('Upload failed: ' + error.message);
+          setUploading(false);
+        }, 
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            
+            // Update Firestore
+            const userRef = doc(db, 'users', profile.uid);
+            await updateDoc(userRef, { 
+              photoURL: downloadURL,
+              updatedAt: new Date().toISOString()
+            });
+
+            // Update Auth Profile
+            if (auth.currentUser) {
+              await updateProfile(auth.currentUser, { photoURL: downloadURL });
+            }
+            
+            // Update local state with final URL
+            setFormData(prev => ({ ...prev, photoURL: downloadURL }));
+            updateProfileState({ ...profile, photoURL: downloadURL } as any);
+            
+            toast.success('Profile picture updated!');
+          } catch (err: any) {
+            console.error("Error getting download URL:", err);
+            toast.error('Failed to get image URL');
+          } finally {
+            setUploading(false);
+          }
+        }
+      );
+    } catch (error: any) {
+      console.error("Upload error catch:", error);
+      toast.error('Failed to upload image');
+      setUploading(false);
+    }
+  };
+
+  const generateAIAvatar = async () => {
+    if (!profile) return;
+    setGeneratingAvatar(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = `A clean, modern, minimalist 3D avatar for a blood donor profile. The avatar should be friendly, wearing casual clothes, with a subtle red accent color. Solid light background. High quality, 8k resolution.`;
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+          parts: [{ text: prompt }],
+        },
+        config: {
+          imageConfig: {
+            aspectRatio: "1:1",
+            imageSize: "1K"
+          }
+        }
       });
 
-      // Update Auth Profile
-      if (auth.currentUser) {
-        await updateProfile(auth.currentUser, { photoURL: downloadURL });
+      let base64Image = '';
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          base64Image = part.inlineData.data;
+          break;
+        }
       }
-      
-      // Update local state
-      setFormData(prev => ({ ...prev, photoURL: downloadURL }));
-      updateProfileState({ ...profile, photoURL: downloadURL } as any);
-      
-      toast.success('Profile picture updated!');
+
+      if (!base64Image) throw new Error('Failed to generate image');
+
+      // Convert base64 to blob
+      const byteCharacters = atob(base64Image);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/png' });
+      const file = new File([blob], `ai_avatar_${Date.now()}.png`, { type: 'image/png' });
+
+      // Optimistic update
+      const objectUrl = URL.createObjectURL(file);
+      setFormData(prev => ({ ...prev, photoURL: objectUrl }));
+      updateProfileState({ ...profile, photoURL: objectUrl } as any);
+
+      // Upload to Firebase
+      const storageRef = ref(storage, `profiles/${profile.uid}/${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', null, 
+        (error) => {
+          toast.error('Failed to save AI avatar');
+        }, 
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          const userRef = doc(db, 'users', profile.uid);
+          await updateDoc(userRef, { photoURL: downloadURL, updatedAt: new Date().toISOString() });
+          if (auth.currentUser) {
+            await updateProfile(auth.currentUser, { photoURL: downloadURL });
+          }
+          setFormData(prev => ({ ...prev, photoURL: downloadURL }));
+          updateProfileState({ ...profile, photoURL: downloadURL } as any);
+          toast.success('AI Avatar generated and saved!');
+        }
+      );
+
     } catch (error: any) {
-      console.error("Upload error:", error);
-      toast.error('Failed to upload image');
+      console.error("AI Avatar generation error:", error);
+      toast.error('Failed to generate AI Avatar');
     } finally {
-      setUploading(false);
+      setGeneratingAvatar(false);
+    }
+  };
+
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedback.trim() || !profile) return;
+    setSubmittingFeedback(true);
+    try {
+      await addDoc(collection(db, 'feedback'), {
+        userId: profile.uid,
+        userName: profile.name,
+        userEmail: profile.email,
+        message: feedback,
+        createdAt: new Date().toISOString(),
+        status: 'new'
+      });
+      setFeedback('');
+      toast.success('Thank you for your feedback!');
+    } catch (error) {
+      toast.error('Failed to submit feedback');
+    } finally {
+      setSubmittingFeedback(false);
     }
   };
 
@@ -150,11 +278,7 @@ const Profile = () => {
                 )}
                 
                 <div className="absolute inset-0 bg-black/40 rounded-[1.25rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  {uploading ? (
-                    <Loader2 className="h-6 w-6 text-white animate-spin" />
-                  ) : (
-                    <Camera className="h-6 w-6 text-white" />
-                  )}
+                  <Camera className="h-6 w-6 text-white" />
                 </div>
                 
                 <input 
@@ -162,17 +286,28 @@ const Profile = () => {
                   accept="image/*" 
                   className="hidden" 
                   onChange={handleImageUpload}
-                  disabled={uploading}
                 />
               </label>
-              
-              {uploading && (
-                <div className="absolute -right-2 -bottom-2 h-8 w-8 bg-white dark:bg-zinc-800 rounded-full shadow-lg flex items-center justify-center border-2 border-red-600">
-                  <Loader2 className="h-4 w-4 text-red-600 animate-spin" />
-                </div>
-              )}
             </div>
           </div>
+          
+          {/* AI Avatar Button */}
+          {!formData.photoURL && (
+            <div className="absolute -bottom-10 right-6">
+              <button
+                onClick={generateAIAvatar}
+                disabled={generatingAvatar}
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all shadow-sm disabled:opacity-50"
+              >
+                {generatingAvatar ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-red-600" />
+                ) : (
+                  <Sparkles className="h-4 w-4 text-red-600" />
+                )}
+                <span className="hidden sm:inline">Generate Avatar</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="pt-12 pb-6 px-6 space-y-4">
@@ -602,6 +737,49 @@ const Profile = () => {
               <p className="text-xs text-zinc-500 font-medium">No records found.</p>
             </div>
           )}
+        </div>
+      </motion.div>
+
+      {/* App Feedback Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-xl overflow-hidden"
+      >
+        <div className="p-4 border-b border-zinc-100 dark:border-zinc-800">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-blue-600" />
+            App Feedback
+          </h3>
+          <p className="text-xs text-zinc-500 mt-1">Help us improve BloodTraking by sharing your thoughts or reporting issues.</p>
+        </div>
+        <div className="p-4">
+          <form onSubmit={handleFeedbackSubmit} className="space-y-3">
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="What do you like? What could be better? Found a bug?"
+              rows={4}
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-600 resize-none text-sm"
+              required
+            />
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={submittingFeedback || !feedback.trim()}
+                className="px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {submittingFeedback ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Submit Feedback'
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </motion.div>
     </div>

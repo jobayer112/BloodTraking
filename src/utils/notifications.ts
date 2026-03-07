@@ -73,7 +73,7 @@ export const notifyMatchingDonors = async (bloodGroup: string, district: string,
         'Emergency Blood Request',
         `A new ${bloodGroup} blood request has been posted in ${district}.`,
         'request',
-        `/requests`
+        `/requests?id=${requestId}`
       )
     );
 

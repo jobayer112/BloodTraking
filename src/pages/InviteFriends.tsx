@@ -24,27 +24,31 @@ const InviteFriends = () => {
 
   // Shorter referral link using shortId
   const inviteLink = `${window.location.origin}/r/${profile?.shortId || profile?.uid || 'guest'}`;
-  const inviteMessage = `Join BloodTraking and save lives! Register here: ${inviteLink}`;
+  const inviteMessage = `Join BloodTraking and save lives!`;
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(inviteMessage);
+    const fullMessage = `${inviteMessage} Register here: ${inviteLink}`;
+    navigator.clipboard.writeText(fullMessage);
     setCopied(true);
     toast.success('Invite message copied to clipboard!');
     setTimeout(() => setCopied(false), 2000);
   };
 
   const shareViaWhatsApp = () => {
-    const url = `https://wa.me/?text=${encodeURIComponent(inviteMessage)}`;
+    const fullMessage = `${inviteMessage} Register here: ${inviteLink}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(fullMessage)}`;
     window.open(url, '_blank');
   };
 
   const shareViaEmail = () => {
-    const url = `mailto:?subject=Join BloodTraking&body=${encodeURIComponent(inviteMessage)}`;
+    const fullMessage = `${inviteMessage} Register here: ${inviteLink}`;
+    const url = `mailto:?subject=Join BloodTraking&body=${encodeURIComponent(fullMessage)}`;
     window.location.href = url;
   };
 
   const shareViaTwitter = () => {
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(inviteMessage)}`;
+    const fullMessage = `${inviteMessage} Register here: ${inviteLink}`;
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(fullMessage)}`;
     window.open(url, '_blank');
   };
 
