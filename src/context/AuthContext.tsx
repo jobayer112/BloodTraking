@@ -5,7 +5,7 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase/config';
 import { UserProfile } from '../types';
 
@@ -55,6 +55,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           // Create a default profile if it doesn't exist (e.g., first time Google login)
           const isAdmin = firebaseUser.email === 'zobaerhasan431@gmail.com' || firebaseUser.uid === 'cWfThoHPOKdviqdkegbyAkDKLjA3';
+          
+          // Check for referral in URL
+          const urlParams = new URLSearchParams(window.location.search);
+          const referralId = urlParams.get('ref');
+
           const newProfile: Partial<UserProfile> = {
             uid: firebaseUser.uid,
             name: firebaseUser.displayName || 'Anonymous',
@@ -63,12 +68,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             role: isAdmin ? 'admin' : 'donor',
             isVerified: isAdmin,
             donationCount: 0,
+            inviteCount: 0,
             lastDonationDate: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          // We don't save yet because we need blood group etc. 
-          // But for the context, we'll set it as a partial or handle in registration flow
+
+          if (referralId) {
+            newProfile.invitedBy = referralId;
+            // Increment inviter's count
+            try {
+              await updateDoc(doc(db, 'users', referralId), {
+                inviteCount: increment(1)
+              });
+            } catch (e) {
+              console.error("Failed to increment inviter count", e);
+            }
+          }
+
+          // Save the new profile
+          await setDoc(docRef, newProfile);
+          
           setProfile(newProfile as UserProfile);
         }
       } else {

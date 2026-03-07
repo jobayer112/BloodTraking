@@ -15,12 +15,29 @@ import {
   BarChart3,
   Search,
   Lock,
-  Home
+  Home,
+  MapPin,
+  PieChart as PieChartIcon,
+  Plus
 } from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell,
+  Legend
+} from 'recharts';
 import { toast } from 'react-hot-toast';
 import { UserProfile, BloodRequest, Post } from '../types';
-import { canDonate } from '../utils/helpers';
+import { canDonate, BLOOD_GROUPS } from '../utils/helpers';
 import { cn } from '../utils/helpers';
+import { increment } from 'firebase/firestore';
 
 const AdminDashboard = () => {
   const { profile } = useAuth();
@@ -34,8 +51,15 @@ const AdminDashboard = () => {
   });
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [chartData, setChartData] = useState<{ bloodGroups: any[], locations: any[], inviters: any[] }>({
+    bloodGroups: [],
+    locations: [],
+    inviters: []
+  });
 
-  const hasAccess = profile?.role === 'admin' || profile?.role === 'moderator';
+  const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#71717a'];
+
+  const hasAccess = profile?.role === 'admin' || (profile?.role as string) === 'moderator';
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -43,11 +67,51 @@ const AdminDashboard = () => {
     // Real-time Stats
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
       const allUsers = snap.docs.map(d => d.data() as UserProfile);
+      
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0];
+
       setStats(prev => ({
         ...prev,
         totalUsers: allUsers.length,
-        activeDonors: allUsers.filter(u => u.role === 'donor' && canDonate(u.lastDonationDate)).length
+        activeDonors: allUsers.filter(u => (u.role as string) === 'donor' && u.lastDonationDate && u.lastDonationDate >= sixMonthsAgoStr).length
       }));
+
+      // Process Blood Group Data
+      const groupCounts: Record<string, number> = {};
+      BLOOD_GROUPS.forEach(g => groupCounts[g] = 0);
+      allUsers.forEach(u => {
+        if (u.bloodGroup && groupCounts[u.bloodGroup] !== undefined) {
+          groupCounts[u.bloodGroup]++;
+        }
+      });
+      const bloodData = Object.entries(groupCounts).map(([name, value]) => ({ name, value }));
+
+      // Process Location Data
+      const locationCounts: Record<string, number> = {};
+      allUsers.forEach(u => {
+        if (u.district) {
+          locationCounts[u.district] = (locationCounts[u.district] || 0) + 1;
+        }
+      });
+      const locationData = Object.entries(locationCounts)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+
+      // Process Inviter Data
+      const inviterData = allUsers
+        .filter(u => (u.inviteCount || 0) > 0)
+        .map(u => ({ name: u.name.split(' ')[0], value: u.inviteCount || 0 }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+
+      setChartData({
+        bloodGroups: bloodData,
+        locations: locationData,
+        inviters: inviterData
+      });
     });
 
     const unsubRequests = onSnapshot(query(collection(db, 'bloodRequests'), where('status', '==', 'open')), (snap) => {
@@ -122,6 +186,19 @@ const AdminDashboard = () => {
       toast.success('Post deleted');
     } catch (error) {
       toast.error('Failed to delete post');
+    }
+  };
+
+  const handleConfirmDonation = async (userId: string) => {
+    if (!window.confirm('Confirm that this user has successfully donated blood today? This will increase their donation count.')) return;
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        donationCount: increment(1),
+        lastDonationDate: new Date().toISOString().split('T')[0]
+      });
+      toast.success('Donation confirmed and count updated!');
+    } catch (error) {
+      toast.error('Failed to confirm donation');
     }
   };
 
@@ -255,6 +332,82 @@ const AdminDashboard = () => {
         ))}
       </div>
 
+      {/* Analytics Charts */}
+      <div className="grid md:grid-cols-2 gap-8">
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm space-y-6">
+          <div className="flex items-center gap-2">
+            <PieChartIcon className="h-5 w-5 text-red-600" />
+            <h3 className="font-bold">Blood Group Distribution</h3>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData.bloodGroups}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {chartData.bloodGroups.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm space-y-6">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-blue-600" />
+            <h3 className="font-bold">Top Donor Locations</h3>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData.locations}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+                <Tooltip 
+                  cursor={{ fill: '#f8fafc' }}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                />
+                <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Inviter Leaderboard */}
+      <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm space-y-6">
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-purple-600" />
+          <h3 className="font-bold">Top Community Builders</h3>
+        </div>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData.inviters} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+              <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+              <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} width={80} />
+              <Tooltip 
+                cursor={{ fill: '#f8fafc' }}
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+              />
+              <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* User Management Table */}
       <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-xl overflow-hidden">
         <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
@@ -348,6 +501,15 @@ const AdminDashboard = () => {
                           title="Unverify User"
                         >
                           <ShieldCheck className="h-5 w-5" />
+                        </button>
+                      )}
+                      {user.role === 'donor' && (
+                        <button 
+                          onClick={() => handleConfirmDonation(user.uid)}
+                          className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 rounded-lg transition-colors"
+                          title="Confirm Blood Donation"
+                        >
+                          <Plus className="h-5 w-5" />
                         </button>
                       )}
                       <button 

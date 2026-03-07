@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { LogIn, Mail, Lock, Chrome, Phone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { auth, db } from '../firebase/config';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
 
 const Login = () => {
   const { t } = useTranslation();
@@ -21,6 +21,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const { signInWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const referralId = searchParams.get('ref');
 
   const setupRecaptcha = () => {
     if (!(window as any).recaptchaVerifier) {
@@ -66,17 +68,32 @@ const Login = () => {
       // Check if profile exists
       const docSnap = await getDoc(doc(db, 'users', user.uid));
       if (!docSnap.exists()) {
-        await setDoc(doc(db, 'users', user.uid), {
+        const userData: any = {
           uid: user.uid,
           phone: user.phoneNumber,
           name: 'Anonymous Donor',
           role: 'donor',
           isVerified: false,
           donationCount: 0,
+          inviteCount: 0,
           lastDonationDate: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-        });
+        };
+
+        if (referralId) {
+          userData.invitedBy = referralId;
+          // Increment inviter's count
+          try {
+            await updateDoc(doc(db, 'users', referralId), {
+              inviteCount: increment(1)
+            });
+          } catch (e) {
+            console.error("Failed to increment inviter count", e);
+          }
+        }
+
+        await setDoc(doc(db, 'users', user.uid), userData);
       }
       toast.success('Logged in successfully!');
       navigate('/profile');
@@ -100,17 +117,32 @@ const Login = () => {
         
         // Create initial profile
         const isAdmin = email === 'zobaerhasan431@gmail.com' || user.uid === 'cWfThoHPOKdviqdkegbyAkDKLjA3';
-        await setDoc(doc(db, 'users', user.uid), {
+        const userData: any = {
           uid: user.uid,
           email: user.email,
           name: email.split('@')[0],
           role: isAdmin ? 'admin' : 'donor',
           isVerified: isAdmin,
           donationCount: 0,
+          inviteCount: 0,
           lastDonationDate: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-        });
+        };
+
+        if (referralId) {
+          userData.invitedBy = referralId;
+          // Increment inviter's count
+          try {
+            await updateDoc(doc(db, 'users', referralId), {
+              inviteCount: increment(1)
+            });
+          } catch (e) {
+            console.error("Failed to increment inviter count", e);
+          }
+        }
+
+        await setDoc(doc(db, 'users', user.uid), userData);
         toast.success('Account created! Please complete your profile.');
       }
       navigate('/profile');

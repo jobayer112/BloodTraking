@@ -92,7 +92,7 @@ const BloodRequests = () => {
   };
 
   const filteredRequests = filterOpen 
-    ? requests.filter(r => r.status === 'open')
+    ? requests.filter(r => (r.status as string) === 'open')
     : requests;
 
   const handleShare = async (request: BloodRequest) => {
@@ -205,7 +205,7 @@ const BloodRequests = () => {
                 </div>
                 <div className={cn(
                   "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
-                  request.status === 'open' ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-500"
+                  (request.status as string) === 'open' ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-500"
                 )}>
                   {request.status}
                 </div>
@@ -237,7 +237,7 @@ const BloodRequests = () => {
               )}
 
               <div className="flex gap-2 pt-1">
-                {request.status === 'open' ? (
+                {(request.status as string) === 'open' ? (
                   <>
                     <a
                       href={`tel:${request.contactPhone}`}
@@ -279,7 +279,7 @@ const BloodRequests = () => {
                   <Share2 className="h-3.5 w-3.5" />
                   Share
                 </button>
-                {request.status === 'open' && (
+                {(request.status as string) === 'open' && (
                   <button 
                     onClick={() => findMatches(request)}
                     className="px-3 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-xs flex items-center gap-1.5 font-bold"

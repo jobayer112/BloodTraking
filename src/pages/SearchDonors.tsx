@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  orderBy, 
+  addDoc, 
+  serverTimestamp, 
+  setDoc, 
+  doc 
+} from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search as SearchIcon, MapPin, Droplets, Phone, User, CheckCircle, LayoutGrid, Map as MapIcon, X, Share2, Calendar, Weight, Ruler, UserPlus } from 'lucide-react';
-import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn, canDonate } from '../utils/helpers';
+import { Search as SearchIcon, MapPin, Droplets, Phone, User, CheckCircle, LayoutGrid, Map as MapIcon, X, Share2, Calendar, Weight, Ruler, UserPlus, MessageSquare, Navigation } from 'lucide-react';
+import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn, canDonate, getBadge, calculateDistance } from '../utils/helpers';
 import { UserProfile } from '../types';
 import DonorMap from '../components/DonorMap';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,6 +27,7 @@ const SearchDonors = () => {
   const [donors, setDonors] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+  const navigate = useNavigate();
   const [filters, setFilters] = useState({
     bloodGroup: searchParams.get('group') || '',
     division: '',
@@ -25,6 +36,7 @@ const SearchDonors = () => {
     donationStatus: 'all', // 'all', 'ready' (4+ months since last donation)
     phoneSearch: searchParams.get('phone') || '',
     nameSearch: '',
+    radius: 0, // 0 means no radius filter
     sortByProximity: false,
   });
   const [selectedDonor, setSelectedDonor] = useState<UserProfile | null>(null);
@@ -71,6 +83,15 @@ const SearchDonors = () => {
         donorList = donorList.filter(d => {
           if (!d.lastDonationDate) return true;
           return new Date(d.lastDonationDate) <= fourMonthsAgo;
+        });
+      }
+
+      // Radius filtering
+      if (filters.radius > 0 && profile?.lat && profile?.lng) {
+        donorList = donorList.filter(d => {
+          if (!d.lat || !d.lng) return false;
+          const dist = calculateDistance(profile.lat!, profile.lng!, d.lat, d.lng);
+          return dist <= filters.radius;
         });
       }
 
@@ -151,6 +172,50 @@ END:VCARD`;
     link.click();
     document.body.removeChild(link);
     toast.success('Contact file generated');
+  };
+
+  const startChat = async (donor: UserProfile) => {
+    if (!profile) {
+      toast.error('Please login to message donors');
+      return;
+    }
+
+    if (profile.uid === donor.uid) {
+      toast.error("You can't message yourself");
+      return;
+    }
+
+    try {
+      // Check if room already exists
+      const q = query(
+        collection(db, 'chatRooms'),
+        where('participants', 'array-contains', profile.uid)
+      );
+      const snapshot = await getDocs(q);
+      let existingRoom = snapshot.docs.find(doc => doc.data().participants.includes(donor.uid));
+
+      if (existingRoom) {
+        navigate('/messages');
+        return;
+      }
+
+      // Create new room
+      const roomId = [profile.uid, donor.uid].sort().join('_');
+      await setDoc(doc(db, 'chatRooms', roomId), {
+        participants: [profile.uid, donor.uid],
+        lastMessage: '',
+        lastMessageAt: serverTimestamp(),
+        unreadCount: {
+          [profile.uid]: 0,
+          [donor.uid]: 0
+        }
+      });
+
+      navigate('/messages');
+    } catch (error) {
+      console.error("Error starting chat:", error);
+      toast.error('Failed to start conversation');
+    }
   };
 
   return (
@@ -269,6 +334,20 @@ END:VCARD`;
               <option value="ready">Ready to Donate (4+ months)</option>
             </select>
           </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Radius (km)</label>
+            <select
+              value={filters.radius}
+              onChange={(e) => setFilters({ ...filters, radius: Number(e.target.value) })}
+              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+            >
+              <option value={0}>Any</option>
+              <option value={5}>5 km</option>
+              <option value={10}>10 km</option>
+              <option value={20}>20 km</option>
+              <option value={50}>50 km</option>
+            </select>
+          </div>
           {profile && (
             <div className="space-y-1 flex flex-col justify-end pb-2">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -360,6 +439,15 @@ END:VCARD`;
                             Verified
                           </div>
                         )}
+                        {getBadge(donor.donationCount) && (
+                          <div className={cn(
+                            "flex items-center gap-0.5 px-1.5 py-0.5 bg-zinc-50 dark:bg-zinc-900/20 rounded-full text-[8px] font-bold border border-zinc-100 dark:border-zinc-800",
+                            getBadge(donor.donationCount)?.color
+                          )}>
+                            <span>{getBadge(donor.donationCount)?.icon}</span>
+                            {getBadge(donor.donationCount)?.name}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <div className={cn(
@@ -406,6 +494,16 @@ END:VCARD`;
                     <Phone className="h-3.5 w-3.5" />
                     {t('call')}
                   </a>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startChat(donor);
+                    }}
+                    className="p-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+                    title="Message Donor"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -473,6 +571,15 @@ END:VCARD`;
                           <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-900/30">
                             <CheckCircle className="h-3 w-3 fill-blue-600/10" />
                             Verified
+                          </div>
+                        )}
+                        {getBadge(selectedDonor.donationCount) && (
+                          <div className={cn(
+                            "flex items-center gap-1 px-2 py-1 bg-zinc-50 dark:bg-zinc-900/20 rounded-full text-xs font-bold border border-zinc-100 dark:border-zinc-800",
+                            getBadge(selectedDonor.donationCount)?.color
+                          )}>
+                            <span>{getBadge(selectedDonor.donationCount)?.icon}</span>
+                            {getBadge(selectedDonor.donationCount)?.name}
                           </div>
                         )}
                       </div>
@@ -566,6 +673,12 @@ END:VCARD`;
                     <Phone className="h-5 w-5" />
                     {t('call')}
                   </a>
+                  <button
+                    onClick={() => startChat(selectedDonor)}
+                    className="p-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl font-bold flex items-center justify-center hover:opacity-90 transition-all"
+                  >
+                    <MessageSquare className="h-5 w-5" />
+                  </button>
                   <button
                     onClick={() => addToContacts(selectedDonor)}
                     className="flex-1 py-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all"

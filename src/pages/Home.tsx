@@ -2,14 +2,20 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
-import { Droplets, Users, Heart, Bell, Search, MessageSquare } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { cn } from '../utils/helpers';
+import { Droplets, Users, Heart, Bell, Search, MessageSquare, MapPin, Navigation } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { cn, BLOOD_GROUPS } from '../utils/helpers';
 import BloodDonationAnimation from '../components/BloodDonationAnimation';
 
 const Home = () => {
   const { t } = useTranslation();
   const { profile } = useAuth();
+  const navigate = useNavigate();
+
+  const [searchFilters, setSearchFilters] = React.useState({
+    bloodGroup: '',
+    radius: '20'
+  });
 
   const stats = [
     { label: t('active_donors'), value: '1,200+', icon: Users, color: 'text-blue-600' },
@@ -80,32 +86,63 @@ const Home = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="max-w-md mx-auto pt-4"
+            className="max-w-3xl mx-auto pt-4"
           >
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                const phone = new FormData(e.currentTarget).get('phone');
-                if (phone) window.location.href = `/search?phone=${phone}`;
-              }}
-              className="relative group"
-            >
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-zinc-400 group-focus-within:text-red-600 transition-colors" />
+            <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-[32px] shadow-2xl space-y-6">
+              <div className="flex items-center gap-2 text-white/80 mb-2">
+                <Search className="h-5 w-5 text-red-500" />
+                <h3 className="font-bold text-lg">Find Blood Donor Near You</h3>
               </div>
-              <input
-                type="text"
-                name="phone"
-                placeholder="Quick search by phone number..."
-                className="w-full pl-12 pr-24 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl outline-none focus:border-red-500 focus:bg-white/20 text-white placeholder:text-zinc-400 text-lg transition-all"
-              />
-              <button
-                type="submit"
-                className="absolute inset-y-2 right-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-all"
-              >
-                Search
-              </button>
-            </form>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-bold text-white/50 uppercase tracking-wider ml-2">Blood Group</label>
+                  <select
+                    value={searchFilters.bloodGroup}
+                    onChange={(e) => setSearchFilters({ ...searchFilters, bloodGroup: e.target.value })}
+                    className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 text-white appearance-none"
+                  >
+                    <option value="" className="bg-zinc-900">Select Group</option>
+                    {BLOOD_GROUPS.map(g => <option key={g} value={g} className="bg-zinc-900">{g}</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-bold text-white/50 uppercase tracking-wider ml-2">Radius (km)</label>
+                  <select
+                    value={searchFilters.radius}
+                    onChange={(e) => setSearchFilters({ ...searchFilters, radius: e.target.value })}
+                    className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 text-white appearance-none"
+                  >
+                    <option value="5" className="bg-zinc-900">5 km</option>
+                    <option value="10" className="bg-zinc-900">10 km</option>
+                    <option value="20" className="bg-zinc-900">20 km</option>
+                    <option value="50" className="bg-zinc-900">50 km</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    onClick={() => navigate(`/search?group=${searchFilters.bloodGroup}&radius=${searchFilters.radius}`)}
+                    className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2"
+                  >
+                    <Search className="h-5 w-5" />
+                    Search Donors
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center gap-4 pt-2 border-t border-white/10">
+                <div className="flex items-center gap-1.5 text-xs text-white/60">
+                  <Navigation className="h-3.5 w-3.5" />
+                  Auto-detect Location
+                </div>
+                <div className="h-1 w-1 rounded-full bg-white/20" />
+                <div className="text-xs text-white/60">
+                  {profile?.district || 'Satkhira'}, {profile?.division || 'Khulna'}
+                </div>
+              </div>
+            </div>
           </motion.div>
         </div>
       </section>

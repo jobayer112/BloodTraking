@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { db, storage } from '../firebase/config';
+import { auth, db, storage } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { updateProfile } from 'firebase/auth';
 import { motion } from 'motion/react';
-import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera, Loader2 } from 'lucide-react';
+import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera, Loader2, Share2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn, canDonate } from '../utils/helpers';
+import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn, canDonate, getBadge } from '../utils/helpers';
 
 const Profile = () => {
   const { t } = useTranslation();
@@ -103,6 +105,11 @@ const Profile = () => {
         photoURL: downloadURL,
         updatedAt: new Date().toISOString()
       });
+
+      // Update Auth Profile
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { photoURL: downloadURL });
+      }
       
       // Update local state
       setFormData(prev => ({ ...prev, photoURL: downloadURL }));
@@ -131,29 +138,24 @@ const Profile = () => {
         {/* Profile Header */}
         <div className="h-24 bg-red-600 relative">
           <div className="absolute -bottom-10 left-6">
-            <label className={cn(
-              "h-20 w-20 rounded-2xl bg-white dark:bg-zinc-800 p-1 shadow-lg group relative block overflow-hidden",
-              isEditing ? "cursor-pointer" : "cursor-default"
-            )}>
-              {formData.photoURL ? (
-                <img src={formData.photoURL} alt={profile.name} className="h-full w-full rounded-xl object-cover" />
-              ) : (
-                <div className="h-full w-full rounded-xl bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center">
-                  <User className="h-12 w-12 text-zinc-400" />
-                </div>
-              )}
-              
-              {isEditing && (
-                <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="relative group">
+              <label className="h-24 w-24 rounded-3xl bg-white dark:bg-zinc-800 p-1 shadow-xl block overflow-hidden cursor-pointer ring-4 ring-white dark:ring-zinc-900 transition-transform hover:scale-105">
+                {formData.photoURL ? (
+                  <img src={formData.photoURL} alt={profile.name} className="h-full w-full rounded-[1.25rem] object-cover" />
+                ) : (
+                  <div className="h-full w-full rounded-[1.25rem] bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center">
+                    <User className="h-12 w-12 text-zinc-400" />
+                  </div>
+                )}
+                
+                <div className="absolute inset-0 bg-black/40 rounded-[1.25rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   {uploading ? (
                     <Loader2 className="h-6 w-6 text-white animate-spin" />
                   ) : (
                     <Camera className="h-6 w-6 text-white" />
                   )}
                 </div>
-              )}
-              
-              {isEditing && (
+                
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -161,8 +163,14 @@ const Profile = () => {
                   onChange={handleImageUpload}
                   disabled={uploading}
                 />
+              </label>
+              
+              {uploading && (
+                <div className="absolute -right-2 -bottom-2 h-8 w-8 bg-white dark:bg-zinc-800 rounded-full shadow-lg flex items-center justify-center border-2 border-red-600">
+                  <Loader2 className="h-4 w-4 text-red-600 animate-spin" />
+                </div>
               )}
-            </label>
+            </div>
           </div>
         </div>
 
@@ -181,6 +189,15 @@ const Profile = () => {
                   <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 dark:border-blue-900/30">
                     <CheckCircle className="h-2.5 w-2.5 fill-blue-600/10" />
                     Verified
+                  </div>
+                )}
+                {getBadge(profile.donationCount) && (
+                  <div className={cn(
+                    "flex items-center gap-1 px-2 py-0.5 bg-zinc-50 dark:bg-zinc-900/20 rounded-full text-[10px] font-bold border border-zinc-100 dark:border-zinc-800",
+                    getBadge(profile.donationCount)?.color
+                  )}>
+                    <span>{getBadge(profile.donationCount)?.icon}</span>
+                    {getBadge(profile.donationCount)?.name}
                   </div>
                 )}
               </div>
@@ -413,6 +430,29 @@ const Profile = () => {
           </div>
         </div>
       </div>
+
+      {/* Share & Invite */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-red-600 rounded-2xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-red-600/20"
+      >
+        <div className="space-y-2 text-center md:text-left">
+          <h3 className="text-xl font-bold flex items-center justify-center md:justify-start gap-2">
+            <Share2 className="h-5 w-5" />
+            Invite Your Friends
+          </h3>
+          <p className="text-sm text-red-100 max-w-md">
+            Help us save more lives by inviting your friends and family to join the BloodTraking community.
+          </p>
+        </div>
+        <Link 
+          to="/invite"
+          className="px-8 py-3 bg-white text-red-600 rounded-xl font-bold hover:bg-red-50 transition-all shadow-lg"
+        >
+          Get Invite Link
+        </Link>
+      </motion.div>
 
       {/* Donation History */}
       <motion.div

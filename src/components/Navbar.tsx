@@ -11,7 +11,8 @@ import {
   Bell,
   Menu,
   X,
-  Droplets
+  Droplets,
+  Share2
 } from 'lucide-react';
 import { db } from '../firebase/config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -26,29 +27,50 @@ const Navbar = () => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [unreadCount, setUnreadCount] = React.useState(0);
+  const [unreadMessages, setUnreadMessages] = React.useState(0);
 
   React.useEffect(() => {
     if (!profile) return;
 
-    const q = query(
+    // Notifications count
+    const qNotify = query(
       collection(db, 'notifications'),
       where('userId', '==', profile.uid),
       where('isRead', '==', false)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubNotify = onSnapshot(qNotify, (snapshot) => {
       setUnreadCount(snapshot.size);
     });
 
-    return () => unsubscribe();
+    // Messages count
+    const qMessages = query(
+      collection(db, 'chatRooms'),
+      where('participants', 'array-contains', profile.uid)
+    );
+
+    const unsubMessages = onSnapshot(qMessages, (snapshot) => {
+      let total = 0;
+      snapshot.docs.forEach(doc => {
+        total += (doc.data().unreadCount?.[profile.uid] || 0);
+      });
+      setUnreadMessages(total);
+    });
+
+    return () => {
+      unsubNotify();
+      unsubMessages();
+    };
   }, [profile]);
 
   const navItems = [
     { name: t('home'), path: '/', icon: Home },
     { name: t('find_donor'), path: '/search', icon: Search },
-    { name: t('contact_donors'), path: '/contacts', icon: Users },
+    { name: 'Sync Contacts', path: '/sync', icon: Users },
     { name: t('requests'), path: '/requests', icon: PlusSquare },
     { name: 'Community', path: '/feed', icon: MessageSquare },
+    { name: 'Messages', path: '/messages', icon: MessageSquare },
+    { name: 'Invite Friends', path: '/invite', icon: Share2 },
     { name: t('profile'), path: '/profile', icon: User },
   ];
 
@@ -85,6 +107,11 @@ const Navbar = () => {
               >
                 <item.icon className="h-4 w-4 mr-2" />
                 {item.name}
+                {item.path === '/messages' && unreadMessages > 0 && (
+                  <span className="ml-1.5 h-4 w-4 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
+                    {unreadMessages}
+                  </span>
+                )}
               </Link>
             ))}
             
@@ -180,6 +207,11 @@ const Navbar = () => {
                 >
                   <item.icon className="h-5 w-5 mr-3" />
                   {item.name}
+                  {item.path === '/messages' && unreadMessages > 0 && (
+                    <span className="ml-auto h-5 w-5 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
+                      {unreadMessages}
+                    </span>
+                  )}
                 </Link>
               ))}
               {profile ? (

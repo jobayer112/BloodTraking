@@ -10,6 +10,9 @@ import SearchDonors from './pages/SearchDonors';
 import BloodRequests from './pages/BloodRequests';
 import SocialFeed from './pages/SocialFeed';
 import ContactDonors from './pages/ContactDonors';
+import ContactSync from './pages/ContactSync';
+import InviteFriends from './pages/InviteFriends';
+import Messages from './pages/Messages';
 import AdminDashboard from './pages/AdminDashboard';
 import Notifications from './pages/Notifications';
 import AIChatbot from './components/AIChatbot';
@@ -27,7 +30,7 @@ const AppContent = () => {
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
       <Navbar />
-      <main className="pb-20 md:pb-0">
+      <main>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -35,6 +38,16 @@ const AppContent = () => {
           <Route path="/requests" element={<BloodRequests />} />
           <Route path="/feed" element={<SocialFeed />} />
           <Route path="/contacts" element={<ContactDonors />} />
+          <Route path="/sync" element={<ContactSync />} />
+          <Route path="/invite" element={<InviteFriends />} />
+          <Route 
+            path="/messages" 
+            element={
+              <ProtectedRoute>
+                <Messages />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/notifications" 
             element={
@@ -57,7 +70,7 @@ const AppContent = () => {
           />
         </Routes>
       </main>
-      <Toaster position="bottom-right" />
+      <Toaster position="top-right" />
       <AIChatbot />
       
       <footer className="bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 py-8 mt-12">
