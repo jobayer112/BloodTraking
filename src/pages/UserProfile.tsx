@@ -99,21 +99,39 @@ const UserProfile = () => {
         // Fetch Posts
         const postsQ = query(
           collection(db, 'posts'),
-          where('authorId', '==', uid),
-          orderBy('createdAt', 'desc')
+          where('authorId', '==', uid)
         );
         const postsSnap = await getDocs(postsQ);
-        const posts = postsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+        const posts = postsSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as Post))
+          .sort((a: any, b: any) => {
+            const getTime = (date: any) => {
+              if (!date) return 0;
+              if (typeof date === 'string') return new Date(date).getTime();
+              if (date.seconds) return date.seconds * 1000;
+              return new Date(date).getTime();
+            };
+            return getTime(b.createdAt) - getTime(a.createdAt);
+          });
         setUserPosts(posts);
 
         // Fetch Requests
         const requestsQ = query(
           collection(db, 'bloodRequests'),
-          where('requesterId', '==', uid),
-          orderBy('createdAt', 'desc')
+          where('requesterId', '==', uid)
         );
         const requestsSnap = await getDocs(requestsQ);
-        const requests = requestsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BloodRequest));
+        const requests = requestsSnap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as BloodRequest))
+          .sort((a: any, b: any) => {
+            const getTime = (date: any) => {
+              if (!date) return 0;
+              if (typeof date === 'string') return new Date(date).getTime();
+              if (date.seconds) return date.seconds * 1000;
+              return new Date(date).getTime();
+            };
+            return getTime(b.createdAt) - getTime(a.createdAt);
+          });
         setUserRequests(requests);
       } catch (error) {
         console.error("Error fetching user content:", error);

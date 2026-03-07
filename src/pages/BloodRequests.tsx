@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Plus, MapPin, Droplets, Calendar, Phone, AlertCircle, Clock, CheckCircle2, X, Trash2, Search, Share2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { BLOOD_GROUPS, DIVISIONS, DISTRICTS_BY_DIVISION, cn } from '../utils/helpers';
 import { BloodRequest } from '../types';
 import { notifyMatchingDonors, createNotification } from '../utils/notifications';
@@ -211,7 +211,9 @@ const BloodRequests = () => {
                     {request.bloodGroup}
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-zinc-900 dark:text-white">{request.requesterName}</h3>
+                    <Link to={`/user/${request.requesterId}`} className="font-bold text-sm text-zinc-900 dark:text-white hover:text-red-600 transition-colors">
+                      {request.requesterName}
+                    </Link>
                     <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider">
                       {request.emergencyLevel === 'critical' ? (
                         <span className="text-red-600 flex items-center gap-1">

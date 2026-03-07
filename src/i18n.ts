@@ -44,7 +44,7 @@ const resources = {
       "hero_title": "Welcome to the Blood Tracking Community",
       "hero_welcome": "Welcome to the",
       "hero_community": "Blood Tracking Community",
-      "hero_subtitle": "Together we can make blood donation faster and easier for everyone. Join, share, and help save lives.",
+      "hero_subtitle": "Connect with donors instantly. Smart matching, real-time alerts, and a community that cares.",
       "active_donors": "Active Donors",
       "lives_saved": "Lives Saved",
       "emergency_alerts": "Emergency Alerts",

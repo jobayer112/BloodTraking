@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquare, Send, X, Bot, User, Sparkles, Loader2, MessageCircle, Trash2 } from 'lucide-react';
+import { MessageSquare, Send, X, Bot, User, Sparkles, Loader2, MessageCircle, Trash2, Mic, MicOff } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
 import { cn } from '../utils/helpers';
 
 const AIChatbot = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'bot', text: string }[]>(() => {
     try {
@@ -23,7 +23,9 @@ const AIChatbot = () => {
   });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -39,6 +41,46 @@ const AIChatbot = () => {
       setTimeout(scrollToBottom, 100);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert('Speech recognition is not supported in this browser.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.lang = i18n.language === 'bn' ? 'bn-BD' : 'en-US';
+      recognitionRef.current.start();
+      setIsListening(true);
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput((prev) => prev + (prev ? ' ' : '') + transcript);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error', event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  };
 
   const clearChat = () => {
     const initial: { role: 'user' | 'bot', text: string }[] = [
@@ -184,11 +226,24 @@ const AIChatbot = () => {
                   }}
                   className="flex gap-2 items-center"
                 >
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    className={cn(
+                      "p-3 rounded-xl transition-all shrink-0",
+                      isListening 
+                        ? "bg-red-100 text-red-600 animate-pulse" 
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    )}
+                    title={isListening ? "Stop Listening" : "Start Voice Input"}
+                  >
+                    {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                  </button>
                   <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask anything..."
+                    placeholder={isListening ? "Listening..." : "Ask anything..."}
                     className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-red-600 min-w-0"
                     autoFocus
                     inputMode="text"

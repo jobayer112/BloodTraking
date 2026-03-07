@@ -144,17 +144,56 @@ const Messages = () => {
 
             return (
               <div className="h-full flex flex-col">
-                <div className="md:hidden p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+                {/* Mobile Header */}
+                <div className="md:hidden p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3 bg-white dark:bg-zinc-900 z-10">
                   <button onClick={() => setSelectedRoomId(null)} className="p-2 -ml-2">
                     <ArrowLeft className="h-5 w-5 text-zinc-400" />
                   </button>
-                  <div className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                  <div 
+                    onClick={() => otherParticipantId && navigate(`/user/${otherParticipantId}`)}
+                    className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 overflow-hidden cursor-pointer"
+                  >
                     {otherParticipant?.photoURL ? (
                       <img src={otherParticipant.photoURL} className="h-full w-full object-cover" />
                     ) : <User className="h-4 w-4 m-2 text-zinc-400" />}
                   </div>
-                  <span className="font-bold text-sm">{otherParticipant?.name || 'Loading...'}</span>
+                  <span 
+                    onClick={() => otherParticipantId && navigate(`/user/${otherParticipantId}`)}
+                    className="font-bold text-sm cursor-pointer hover:text-red-600 transition-colors"
+                  >
+                    {otherParticipant?.name || 'Loading...'}
+                  </span>
                 </div>
+
+                {/* Desktop Header */}
+                <div className="hidden md:flex p-4 border-b border-zinc-100 dark:border-zinc-800 items-center gap-3 bg-white dark:bg-zinc-900 z-10">
+                  <div 
+                    onClick={() => otherParticipantId && navigate(`/user/${otherParticipantId}`)}
+                    className="h-10 w-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {otherParticipant?.photoURL ? (
+                      <img src={otherParticipant.photoURL} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <User className="h-5 w-5 text-zinc-400" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h3 
+                      onClick={() => otherParticipantId && navigate(`/user/${otherParticipantId}`)}
+                      className="font-bold text-zinc-900 dark:text-white cursor-pointer hover:text-red-600 transition-colors"
+                    >
+                      {otherParticipant?.name || 'Loading...'}
+                    </h3>
+                    {otherParticipant?.bloodGroup && (
+                      <div className="text-xs text-zinc-500 font-medium">
+                        Blood Group: <span className="text-red-600 font-bold">{otherParticipant.bloodGroup}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <ChatWindow roomId={selectedRoomId} />
               </div>
             );
