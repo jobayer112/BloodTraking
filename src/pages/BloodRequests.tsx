@@ -25,6 +25,7 @@ const BloodRequests = () => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newRequest, setNewRequest] = useState({
     bloodGroup: '',
     emergencyLevel: 'normal',
@@ -117,9 +118,15 @@ const BloodRequests = () => {
     }
   };
 
-  const filteredRequests = filterOpen 
-    ? requests.filter(r => (r.status as string) === 'open')
-    : requests;
+  const filteredRequests = requests.filter(r => {
+    const matchesFilter = filterOpen ? (r.status as string) === 'open' : true;
+    const matchesSearch = 
+      r.hospitalName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.district.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.bloodGroup.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.requesterName?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
 
   const handleShare = async (request: BloodRequest) => {
     const shareText = `Emergency Blood Request!\nGroup: ${request.bloodGroup}\nHospital: ${request.hospitalName}\nDistrict: ${request.district}\nDate: ${new Date(request.requiredDate).toLocaleDateString()}\nContact: ${request.contactPhone}\nNote: ${request.note || 'N/A'}`;
@@ -159,17 +166,31 @@ const BloodRequests = () => {
   const availableDistricts = newRequest.division ? DISTRICTS_BY_DIVISION[newRequest.division] : [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="space-y-1 text-center md:text-left">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">{t('requests')}</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">View and respond to urgent blood needs in your community.</p>
+    <div className="max-w-7xl mx-auto px-4 py-12 space-y-12">
+      <div className="flex flex-col md:flex-row justify-between items-end gap-6">
+        <div className="space-y-4 text-center md:text-left">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-full text-[10px] font-bold tracking-widest uppercase border border-red-100 dark:border-red-900/30">
+            <AlertCircle className="h-3 w-3" />
+            Urgent Needs
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-zinc-900 dark:text-white leading-none">{t('requests')}</h1>
+          <p className="text-zinc-500 dark:text-zinc-400 max-w-xl font-medium">View and respond to urgent blood needs in your community.</p>
         </div>
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Search hospital, district..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none transition-all"
+            />
+          </div>
           <button
             onClick={() => setFilterOpen(!filterOpen)}
             className={cn(
-              "px-4 py-2 rounded-xl text-xs font-bold transition-all border",
+              "w-full sm:w-auto px-6 py-3.5 rounded-2xl text-xs font-black transition-all uppercase tracking-widest border",
               filterOpen 
                 ? "bg-red-50 border-red-200 text-red-600" 
                 : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500"
@@ -179,7 +200,7 @@ const BloodRequests = () => {
           </button>
           <button
             onClick={() => setShowModal(true)}
-            className="w-full md:w-auto px-6 py-3 bg-red-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 text-sm"
+            className="btn-primary w-full sm:w-auto py-3.5"
           >
             <Plus className="h-4 w-4" />
             {t('request_blood')}
@@ -188,12 +209,13 @@ const BloodRequests = () => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <div className="flex flex-col items-center justify-center py-32 space-y-4">
+          <div className="h-12 w-12 border-4 border-red-600/20 border-t-red-600 rounded-full animate-spin" />
+          <p className="text-zinc-500 font-bold animate-pulse">Loading requests...</p>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredRequests.map((request, index) => (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filteredRequests.length > 0 ? filteredRequests.map((request, index) => (
             <motion.div
               key={request.id}
               id={request.id}
@@ -201,133 +223,161 @@ const BloodRequests = () => {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.05 }}
               className={cn(
-                "bg-white dark:bg-zinc-900 p-6 rounded-3xl border shadow-sm space-y-4",
+                "card group relative flex flex-col",
                 request.emergencyLevel === 'critical' 
-                  ? "border-red-200 dark:border-red-900/30 bg-red-50/30 dark:bg-red-900/5" 
+                  ? "border-red-200 dark:border-red-900/30 bg-red-50/10 dark:bg-red-900/5" 
                   : request.emergencyLevel === 'urgent'
-                    ? "border-amber-200 dark:border-amber-900/30 bg-amber-50/30 dark:bg-amber-900/5"
-                    : "border-zinc-100 dark:border-zinc-800"
+                    ? "border-amber-200 dark:border-amber-900/30 bg-amber-50/10 dark:bg-amber-900/5"
+                    : ""
               )}
             >
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-2">
+              {request.emergencyLevel === 'critical' && (
+                <div className="absolute -top-3 -right-3 h-8 w-8 bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg animate-bounce z-10">
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+              )}
+
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-4">
                   <div className={cn(
-                    "h-10 w-10 rounded-xl flex items-center justify-center font-bold text-lg",
+                    "h-14 w-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-sm border",
                     request.emergencyLevel === 'critical' 
-                      ? "bg-red-600 text-white" 
+                      ? "bg-red-600 text-white border-red-700" 
                       : request.emergencyLevel === 'urgent'
-                        ? "bg-amber-500 text-white"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-red-600"
+                        ? "bg-amber-500 text-white border-amber-600"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-red-600 border-zinc-200 dark:border-zinc-700"
                   )}>
                     {request.bloodGroup}
                   </div>
-                  <div>
-                    <Link to={`/user/${request.requesterId}`} className="font-bold text-sm text-zinc-900 dark:text-white hover:text-red-600 transition-colors">
+                  <div className="space-y-1">
+                    <Link to={`/user/${request.requesterId}`} className="font-black text-zinc-900 dark:text-white hover:text-red-600 transition-colors leading-tight">
                       {request.requesterName}
                     </Link>
-                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider">
-                      {request.emergencyLevel === 'critical' ? (
-                        <span className="text-red-600 flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" /> Critical
-                        </span>
-                      ) : request.emergencyLevel === 'urgent' ? (
-                        <span className="text-amber-600 flex items-center gap-1">
-                          <Clock className="h-3 w-3" /> Urgent
-                        </span>
-                      ) : (
-                        <span className="text-zinc-500">Normal</span>
-                      )}
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border",
+                        request.emergencyLevel === 'critical' 
+                          ? "bg-red-100 text-red-700 border-red-200" 
+                          : request.emergencyLevel === 'urgent'
+                            ? "bg-amber-100 text-amber-700 border-amber-200"
+                            : "bg-zinc-100 text-zinc-500 border-zinc-200"
+                      )}>
+                        {request.emergencyLevel}
+                      </div>
+                      <div className={cn(
+                        "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border",
+                        (request.status as string) === 'open' ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-zinc-100 text-zinc-500 border-zinc-200"
+                      )}>
+                        {request.status}
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className={cn(
-                  "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
-                  (request.status as string) === 'open' ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-500"
-                )}>
-                  {request.status}
-                </div>
               </div>
 
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-                  <MapPin className="h-3.5 w-3.5 text-zinc-400" />
-                  <span>{request.hospitalName}, {request.district}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-                  <Calendar className="h-3.5 w-3.5 text-zinc-400" />
-                  <div className="flex items-center justify-between w-full">
-                    <span>Needed by: {new Date(request.requiredDate).toLocaleDateString()}</span>
-                    <button 
-                      onClick={() => addToCalendar(request)}
-                      className="text-[10px] text-red-600 font-bold hover:underline"
-                    >
-                      + Calendar
-                    </button>
+              <div className="space-y-4 mb-6">
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-4 w-4 text-red-600 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Hospital</div>
+                      <div className="text-xs font-bold text-zinc-900 dark:text-white">{request.hospitalName}, {request.district}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-4 w-4 text-red-600 mt-0.5" />
+                    <div className="flex-1 space-y-0.5">
+                      <div className="flex justify-between items-center">
+                        <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Required Date</div>
+                        <button 
+                          onClick={() => addToCalendar(request)}
+                          className="text-[10px] text-red-600 font-black hover:underline uppercase tracking-widest"
+                        >
+                          + Add to Calendar
+                        </button>
+                      </div>
+                      <div className="text-xs font-bold text-zinc-900 dark:text-white">{new Date(request.requiredDate).toLocaleDateString(undefined, { dateStyle: 'long' })}</div>
+                    </div>
                   </div>
                 </div>
+
+                {request.note && (
+                  <div className="relative p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 italic text-sm text-zinc-500">
+                    <div className="absolute -top-2 left-4 px-2 bg-white dark:bg-zinc-900 text-[8px] font-black text-zinc-400 uppercase tracking-widest">Note</div>
+                    "{request.note}"
+                  </div>
+                )}
               </div>
 
-              {request.note && (
-                <p className="text-sm text-zinc-500 dark:text-zinc-500 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl italic">
-                  "{request.note}"
-                </p>
-              )}
-
-              <div className="flex gap-2 pt-1">
+              <div className="mt-auto flex flex-wrap gap-2">
                 {(request.status as string) === 'open' ? (
                   <>
                     <a
                       href={`tel:${request.contactPhone}`}
-                      className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold text-xs text-center hover:bg-red-700 transition-all flex items-center justify-center gap-1.5"
+                      className="flex-1 py-3.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-xl shadow-zinc-900/20 dark:shadow-white/10"
                     >
-                      <Phone className="h-3.5 w-3.5" />
+                      <Phone className="h-4 w-4" />
                       Call Now
                     </a>
                     {(profile?.uid === request.requesterId || profile?.role === 'admin') && (
-                      <div className="flex gap-1">
+                      <div className="flex gap-2">
                         <button
                           onClick={() => handleFulfill(request.id)}
-                          className="px-3 py-2.5 bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 transition-all font-bold text-xs flex items-center gap-1.5"
+                          className="p-3.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-2xl hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all border border-emerald-100 dark:border-emerald-900/30"
+                          title="Mark as Fulfilled"
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Fulfill
+                          <CheckCircle2 className="h-5 w-5" />
                         </button>
                         {profile?.role === 'admin' && (
                           <button
                             onClick={() => handleDelete(request.id)}
-                            className="px-3 py-2.5 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-all font-bold text-xs flex items-center gap-1.5"
+                            className="p-3.5 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/30 transition-all border border-red-100 dark:border-red-900/30"
+                            title="Delete Request"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-5 w-5" />
                           </button>
                         )}
                       </div>
                     )}
                   </>
                 ) : (
-                  <div className="w-full py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-xl font-bold text-xs text-center flex items-center justify-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  <div className="w-full py-3.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 border border-zinc-200 dark:border-zinc-700">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                     Request Fulfilled
                   </div>
                 )}
-                <button 
-                  onClick={() => handleShare(request)}
-                  className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all text-xs flex items-center gap-1.5"
-                >
-                  <Share2 className="h-3.5 w-3.5" />
-                  Share
-                </button>
-                {(request.status as string) === 'open' && (
+                
+                <div className="w-full flex gap-2">
                   <button 
-                    onClick={() => findMatches(request)}
-                    className="px-3 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-xs flex items-center gap-1.5 font-bold"
+                    onClick={() => handleShare(request)}
+                    className="flex-1 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-2xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
                   >
-                    <Search className="h-3.5 w-3.5" />
-                    Find Donors
+                    <Share2 className="h-3.5 w-3.5" />
+                    Share
                   </button>
-                )}
+                  {(request.status as string) === 'open' && (
+                    <button 
+                      onClick={() => findMatches(request)}
+                      className="flex-1 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                    >
+                      <Search className="h-3.5 w-3.5" />
+                      Find Donors
+                    </button>
+                  )}
+                </div>
               </div>
             </motion.div>
-          ))}
+          )) : (
+            <div className="col-span-full text-center py-32 space-y-6">
+              <div className="h-24 w-24 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto">
+                <Droplets className="h-12 w-12 text-zinc-400" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-zinc-900 dark:text-white">No Requests Found</h3>
+                <p className="text-zinc-500 font-medium max-w-sm mx-auto">There are no active blood requests at the moment. Check back later or create one if needed.</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -346,36 +396,39 @@ const BloodRequests = () => {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
-              <div className="p-8 space-y-6">
+              <div className="p-8 md:p-12 space-y-8">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">{t('request_blood')}</h2>
-                  <button onClick={() => setShowModal(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full">
+                  <div className="space-y-1">
+                    <h2 className="text-3xl font-black text-zinc-900 dark:text-white leading-tight">{t('request_blood')}</h2>
+                    <p className="text-sm text-zinc-500 font-medium">Fill in the details to post an urgent blood request.</p>
+                  </div>
+                  <button onClick={() => setShowModal(false)} className="p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-2xl transition-colors">
                     <X className="h-6 w-6" />
                   </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">{t('blood_group')}</label>
+                    <label className="label-text ml-1">{t('blood_group')}</label>
                     <select
                       required
                       value={newRequest.bloodGroup}
                       onChange={(e) => setNewRequest({ ...newRequest, bloodGroup: e.target.value })}
-                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
+                      className="input-field py-3.5"
                     >
                       <option value="">Select Group</option>
                       {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Emergency Level</label>
+                    <label className="label-text ml-1">Emergency Level</label>
                     <select
                       required
                       value={newRequest.emergencyLevel}
                       onChange={(e) => setNewRequest({ ...newRequest, emergencyLevel: e.target.value })}
-                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
+                      className="input-field py-3.5"
                     >
                       <option value="normal">Normal</option>
                       <option value="urgent">Urgent</option>
@@ -383,72 +436,75 @@ const BloodRequests = () => {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Hospital Name</label>
+                    <label className="label-text ml-1">Hospital Name</label>
                     <input
                       required
                       type="text"
                       value={newRequest.hospitalName}
                       onChange={(e) => setNewRequest({ ...newRequest, hospitalName: e.target.value })}
-                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
+                      className="input-field py-3.5"
+                      placeholder="e.g. Dhaka Medical College"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">{t('division')}</label>
+                    <label className="label-text ml-1">{t('division')}</label>
                     <select
                       required
                       value={newRequest.division}
                       onChange={(e) => setNewRequest({ ...newRequest, division: e.target.value, district: '' })}
-                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
+                      className="input-field py-3.5"
                     >
                       <option value="">Select Division</option>
                       {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">{t('district')}</label>
+                    <label className="label-text ml-1">{t('district')}</label>
                     <select
                       required
                       value={newRequest.district}
                       onChange={(e) => setNewRequest({ ...newRequest, district: e.target.value })}
                       disabled={!newRequest.division}
-                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 disabled:opacity-50"
+                      className="input-field py-3.5"
                     >
                       <option value="">Select District</option>
                       {availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Required Date</label>
+                    <label className="label-text ml-1">Required Date</label>
                     <input
                       required
                       type="date"
                       value={newRequest.requiredDate}
                       onChange={(e) => setNewRequest({ ...newRequest, requiredDate: e.target.value })}
-                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
+                      className="input-field py-3.5"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Contact Phone</label>
+                    <label className="label-text ml-1">Contact Phone</label>
                     <input
                       required
                       type="tel"
                       value={newRequest.contactPhone}
                       onChange={(e) => setNewRequest({ ...newRequest, contactPhone: e.target.value })}
-                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
+                      className="input-field py-3.5"
+                      placeholder="01XXXXXXXXX"
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase">Additional Note</label>
+                    <label className="label-text ml-1">Additional Note</label>
                     <textarea
                       value={newRequest.note}
                       onChange={(e) => setNewRequest({ ...newRequest, note: e.target.value })}
                       rows={3}
-                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 resize-none"
+                      className="input-field py-3.5 resize-none"
+                      placeholder="Any specific instructions or details..."
                     />
                   </div>
                   <button
                     type="submit"
-                    className="md:col-span-2 py-4 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all"
+                    className="btn-primary md:col-span-2 py-4 text-sm"
                   >
                     Post Request
                   </button>

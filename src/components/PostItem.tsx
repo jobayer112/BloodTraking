@@ -3,7 +3,7 @@ import { db } from '../firebase/config';
 import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, arrayUnion, arrayRemove, increment, where, deleteDoc } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquare, Heart, Share2, Send, User, MoreVertical, Play, X, Trash2, Phone, Reply, Edit2, AlertTriangle, Image as ImageIcon, Video, Loader2 } from 'lucide-react';
+import { MessageSquare, Heart, Share2, Send, User, MoreVertical, Play, X, Trash2, Phone, Reply, Edit2, AlertTriangle, Image as ImageIcon, Video, Loader2, ArrowRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -141,6 +141,8 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
       // Sort in memory to avoid composite index requirement
       commentList.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       setComments(commentList);
+    }, (error) => {
+      console.error("Comments Fetch Error:", error);
     });
 
     return () => unsubscribe();
@@ -375,26 +377,26 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
       id={id}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-800 overflow-hidden"
+      className="card group"
     >
-      <div className="p-4 space-y-3">
+      <div className="space-y-4">
         <div className="flex justify-between items-start">
-          <Link to={`/user/${authorId}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="h-9 w-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+          <Link to={`/user/${authorId}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <div className="h-12 w-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center ring-2 ring-white dark:ring-zinc-900 shadow-sm">
               {authorPhoto ? (
-                <img src={authorPhoto} alt={authorName} className="h-full w-full rounded-xl object-cover" />
+                <img src={authorPhoto} alt={authorName} className="h-full w-full rounded-2xl object-cover" />
               ) : (
-                <User className="h-5 w-5 text-zinc-400" />
+                <User className="h-6 w-6 text-zinc-400" />
               )}
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h4 className="font-bold text-sm text-zinc-900 dark:text-white">{authorName}</h4>
                 {profile && profile.uid !== authorId && (
                   <button
                     onClick={handleFollow}
                     className={cn(
-                      "px-2 py-0.5 rounded-md text-[10px] font-bold transition-all flex items-center gap-1",
+                      "px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1",
                       isFollowing 
                         ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700" 
                         : "bg-red-50 dark:bg-red-900/20 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30"
@@ -414,13 +416,13 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
                   </button>
                 )}
                 {post.type === 'emergency' && (
-                  <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 text-[10px] font-bold rounded-md flex items-center gap-1">
+                  <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 text-[10px] font-bold rounded-lg flex items-center gap-1 animate-pulse">
                     <AlertTriangle className="h-3 w-3" />
                     {post.bloodGroup} Emergency
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-zinc-500">{formatDate(post.createdAt)}</p>
+              <p className="text-[10px] font-medium text-zinc-500 mt-0.5">{formatDate(post.createdAt)}</p>
             </div>
           </Link>
           <div className="flex items-center gap-1">
@@ -435,7 +437,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
                   setEditBloodGroup(post.bloodGroup || '');
                   setIsEditing(true);
                 }}
-                className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
+                className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all"
                 title="Edit Post"
               >
                 <Edit2 className="h-4 w-4" />
@@ -444,38 +446,45 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
             <div className="relative" ref={menuRef}>
               <button 
                 onClick={() => setShowMenu(!showMenu)}
-                className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full"
+                className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
               >
                 <MoreVertical className="h-4 w-4 text-zinc-400" />
               </button>
-              {showMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white dark:bg-zinc-800 shadow-xl border border-zinc-100 dark:border-zinc-700 rounded-xl py-1 z-10 min-w-[120px]">
-                  {(profile?.uid === authorId || profile?.role === 'admin') && (
-                    <button
-                      onClick={() => {
-                        handleDelete();
-                        setShowMenu(false);
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 w-full text-left"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete Post
-                    </button>
-                  )}
-                  {profile?.uid !== authorId && (
-                    <button
-                      onClick={() => {
-                        handleReport();
-                        setShowMenu(false);
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 w-full text-left"
-                    >
-                      <AlertTriangle className="h-4 w-4" />
-                      Report Post
-                    </button>
-                  )}
-                </div>
-              )}
+              <AnimatePresence>
+                {showMenu && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    className="absolute right-0 top-full mt-2 bg-white dark:bg-zinc-800 shadow-2xl border border-zinc-100 dark:border-zinc-700 rounded-2xl py-2 z-20 min-w-[160px] overflow-hidden"
+                  >
+                    {(profile?.uid === authorId || profile?.role === 'admin') && (
+                      <button
+                        onClick={() => {
+                          handleDelete();
+                          setShowMenu(false);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 w-full text-left transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete Post
+                      </button>
+                    )}
+                    {profile?.uid !== authorId && (
+                      <button
+                        onClick={() => {
+                          handleReport();
+                          setShowMenu(false);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 w-full text-left transition-colors"
+                      >
+                        <AlertTriangle className="h-4 w-4" />
+                        Report Post
+                      </button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
@@ -485,13 +494,13 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 focus:ring-2 focus:ring-red-600 outline-none resize-none min-h-[100px] text-sm"
+              className="input-field min-h-[120px]"
             />
             <div className="flex flex-wrap gap-3">
               <select
                 value={editPostType}
                 onChange={(e) => setEditPostType(e.target.value as 'general' | 'emergency')}
-                className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-600"
+                className="input-field w-auto"
               >
                 <option value="general">General Post</option>
                 <option value="emergency">Emergency Request</option>
@@ -501,7 +510,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
                 <select
                   value={editBloodGroup}
                   onChange={(e) => setEditBloodGroup(e.target.value as BloodGroup)}
-                  className="bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-100 dark:border-red-800/50 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-600 font-bold"
+                  className="input-field w-auto font-bold text-red-600"
                 >
                   <option value="">Select Blood Group</option>
                   {bloodGroups.map(bg => (
@@ -511,69 +520,69 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
               )}
             </div>
 
-            <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl px-4 py-2 border border-zinc-200 dark:border-zinc-700">
-              <Phone className="h-4 w-4 text-zinc-400" />
+            <div className="relative">
+              <Phone className="absolute left-4 top-3.5 h-4 w-4 text-zinc-400" />
               <input
                 type="tel"
                 placeholder="Phone number (optional)"
                 value={editPhone}
                 onChange={(e) => setEditPhone(e.target.value)}
-                className="bg-transparent border-none outline-none text-sm w-full"
+                className="input-field pl-11"
               />
             </div>
             
             {editMediaURL && (
-              <div className="relative rounded-2xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
+              <div className="relative rounded-[2rem] overflow-hidden border border-zinc-100 dark:border-zinc-800">
                 <button 
                   onClick={() => { setEditMediaURL(''); setEditMediaType(null); }}
-                  className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full hover:bg-black/70 z-10"
+                  className="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 z-10 backdrop-blur-md"
                 >
                   <X className="h-4 w-4" />
                 </button>
                 {editMediaType === 'image' ? (
-                  <img src={editMediaURL} alt="Preview" className="w-full h-auto max-h-80 object-cover" />
+                  <img src={editMediaURL} alt="Preview" className="w-full h-auto max-h-[400px] object-cover" />
                 ) : (
-                  <video src={editMediaURL} controls className="w-full max-h-80 bg-black" />
+                  <video src={editMediaURL} controls className="w-full max-h-[400px] bg-black" />
                 )}
               </div>
             )}
 
-            <div className="flex justify-between items-center pt-2">
+            <div className="flex justify-between items-center pt-4 border-t border-zinc-100 dark:border-zinc-800">
               <div className="flex gap-4">
-                <label className="flex items-center gap-2 font-medium text-zinc-500 hover:text-red-600 transition-colors cursor-pointer text-sm">
+                <label className="flex items-center gap-2 font-bold text-zinc-500 hover:text-red-600 transition-colors cursor-pointer text-xs">
                   <ImageIcon className="h-4 w-4" />
                   Photo
                   <input type="file" accept="image/*" className="hidden" onChange={handleEditFileUpload} disabled={isUploading} />
                 </label>
-                <label className="flex items-center gap-2 font-medium text-zinc-500 hover:text-red-600 transition-colors cursor-pointer text-sm">
+                <label className="flex items-center gap-2 font-bold text-zinc-500 hover:text-red-600 transition-colors cursor-pointer text-xs">
                   <Video className="h-4 w-4" />
                   Video
                   <input type="file" accept="video/*" className="hidden" onChange={handleEditFileUpload} disabled={isUploading} />
                 </label>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <button
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                  className="px-4 py-2 text-xs font-bold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveEdit}
                   disabled={isSaving || isUploading || (!editContent.trim() && !editMediaURL)}
-                  className="px-4 py-1.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="btn-primary py-2 px-6"
                 >
-                  {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}
                 </button>
               </div>
             </div>
           </div>
         ) : (
-          <>
+          <div className="space-y-4">
             <div className="relative">
               <p className={cn(
                 "text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap",
-                !isExpanded && shouldTruncate && "line-clamp-3"
+                !isExpanded && shouldTruncate && "line-clamp-4"
               )}>
                 {renderContentWithHashtags(post.content)}
               </p>
@@ -583,16 +592,17 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
                     e.stopPropagation();
                     setIsExpanded(!isExpanded);
                   }}
-                  className="text-sm font-bold text-blue-600 hover:text-blue-700 mt-1"
+                  className="text-sm font-bold text-red-600 hover:text-red-700 mt-2 flex items-center gap-1"
                 >
-                  {isExpanded ? 'See less' : 'See more'}
+                  {isExpanded ? 'Show less' : 'Read more'}
+                  <ArrowRight className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")} />
                 </button>
               )}
             </div>
 
             {post.phone && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 w-fit">
-                <Phone className="h-3.5 w-3.5 text-red-600" />
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 w-fit group/phone">
+                <Phone className="h-4 w-4 text-red-600 group-hover/phone:animate-bounce" />
                 <a href={`tel:${post.phone}`} className="text-xs font-bold text-zinc-900 dark:text-white hover:text-red-600 transition-colors">
                   {post.phone}
                 </a>
@@ -600,46 +610,58 @@ const PostItem: React.FC<PostItemProps> = ({ post, profile, onHashtagClick, id }
             )}
 
             {mediaURL && (
-              <div className="rounded-xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
+              <div className="rounded-[2rem] overflow-hidden border border-zinc-100 dark:border-zinc-800 shadow-inner">
                 {post.mediaType === 'video' ? (
                   <div className="aspect-video bg-black relative group cursor-pointer">
                     <video src={mediaURL} className="w-full h-full object-cover" controls />
                   </div>
                 ) : (
-                  <img src={mediaURL} alt="Post content" className="w-full h-auto" />
+                  <img src={mediaURL} alt="Post content" className="w-full h-auto hover:scale-[1.02] transition-transform duration-500" />
                 )}
               </div>
             )}
-          </>
+          </div>
         )}
 
-        <div className="flex items-center gap-4 pt-3 border-t border-zinc-50 dark:border-zinc-800/50">
+        <div className="flex items-center gap-6 pt-4 border-t border-zinc-50 dark:border-zinc-800/50">
           <button 
             onClick={handleLike}
             className={cn(
-              "flex items-center gap-1.5 text-sm font-bold transition-colors",
+              "flex items-center gap-2 text-sm font-bold transition-all active:scale-90",
               isLiked ? "text-red-600" : "text-zinc-500 hover:text-red-600"
             )}
           >
-            <Heart className={cn("h-4 w-4", isLiked && "fill-current")} />
+            <div className={cn(
+              "p-2 rounded-xl transition-colors",
+              isLiked ? "bg-red-50 dark:bg-red-900/20" : "bg-zinc-50 dark:bg-zinc-800/50 group-hover:bg-red-50 dark:group-hover:bg-red-900/10"
+            )}>
+              <Heart className={cn("h-4 w-4", isLiked && "fill-current")} />
+            </div>
             {likes.length}
           </button>
           <button 
             onClick={() => setShowComments(!showComments)}
             className={cn(
-              "flex items-center gap-1.5 text-sm font-bold transition-colors",
+              "flex items-center gap-2 text-sm font-bold transition-all active:scale-90",
               showComments ? "text-blue-600" : "text-zinc-500 hover:text-blue-600"
             )}
           >
-            <MessageSquare className="h-4 w-4" />
+            <div className={cn(
+              "p-2 rounded-xl transition-colors",
+              showComments ? "bg-blue-50 dark:bg-blue-900/20" : "bg-zinc-50 dark:bg-zinc-800/50 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/10"
+            )}>
+              <MessageSquare className="h-4 w-4" />
+            </div>
             {commentCount}
           </button>
           <button 
             onClick={handleShare}
-            className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-emerald-600 font-bold transition-colors"
+            className="flex items-center gap-2 text-sm text-zinc-500 hover:text-emerald-600 font-bold transition-all active:scale-90 ml-auto"
           >
-            <Share2 className="h-4 w-4" />
-            Share
+            <div className="p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/10 transition-colors">
+              <Share2 className="h-4 w-4" />
+            </div>
+            <span className="hidden sm:inline">Share</span>
           </button>
         </div>
 

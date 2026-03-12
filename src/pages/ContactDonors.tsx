@@ -132,6 +132,9 @@ const ContactDonors = () => {
             const otherUnregistered = prev.filter(p => !chunk.includes(p.phone));
             return [...otherUnregistered, ...newUnregistered];
           });
+        }, (error) => {
+          console.error("Firestore onSnapshot error:", error);
+          toast.error("Error syncing contacts: " + error.message);
         });
         newUnsubs.push(unsubscribe);
       }

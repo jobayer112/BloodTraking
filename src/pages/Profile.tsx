@@ -5,8 +5,8 @@ import { auth, db, storage } from '../firebase/config';
 import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
-import { motion } from 'motion/react';
-import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera, Loader2, Share2, QrCode, MessageSquare, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { User, Phone, MapPin, Droplets, Calendar, CheckCircle, Shield, Heart, Scale, Ruler, Camera, Loader2, Share2, QrCode, MessageSquare, Sparkles, ArrowRight, Award, Zap } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -305,589 +305,452 @@ const Profile = () => {
   const availableDistricts = formData.division ? DISTRICTS_BY_DIVISION[formData.division] : [];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-zinc-100 dark:border-zinc-800"
-      >
-        {/* Profile Header */}
-        <div className="h-24 bg-red-600 relative">
-          <div className="absolute -bottom-10 left-6">
-            <div className="relative group">
-              <label className="h-24 w-24 rounded-3xl bg-white dark:bg-zinc-800 p-1 shadow-xl block overflow-hidden cursor-pointer ring-4 ring-white dark:ring-zinc-900 transition-transform hover:scale-105">
-                {formData.photoURL ? (
-                  <img src={formData.photoURL} alt={profile.name} className="h-full w-full rounded-[1.25rem] object-cover" />
-                ) : (
-                  <div className="h-full w-full rounded-[1.25rem] bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center">
-                    <User className="h-12 w-12 text-zinc-400" />
-                  </div>
-                )}
-                
-                <div className="absolute inset-0 bg-black/40 rounded-[1.25rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera className="h-6 w-6 text-white" />
-                </div>
-                
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleImageUpload}
-                />
-              </label>
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#FDFCFB] dark:bg-[#0A0A0A] text-[#1A1A1A] dark:text-[#F5F5F5] font-sans selection:bg-red-100 dark:selection:bg-red-900/30">
+      <div className="max-w-[1400px] mx-auto px-6 py-12 lg:py-20">
+        
+        {/* Hero Section: Split Layout */}
+        <div className="grid lg:grid-cols-12 gap-12 lg:gap-20 items-start">
           
-          {/* AI Avatar Button */}
-          <div className="absolute -bottom-10 right-6">
-            <button
-              onClick={generateAIAvatar}
-              disabled={generatingAvatar}
-              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all shadow-sm disabled:opacity-50"
+          {/* Left Column: Profile Identity */}
+          <div className="lg:col-span-5 space-y-12 sticky top-12">
+            <motion.div 
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="space-y-8"
             >
-              {generatingAvatar ? (
-                <Loader2 className="h-4 w-4 animate-spin text-red-600" />
-              ) : (
-                <Sparkles className="h-4 w-4 text-red-600" />
-              )}
-              <span className="hidden sm:inline">Generate Avatar</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="pt-12 pb-6 px-6 space-y-4">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                  {profile.name}
-                  <div className={cn(
-                    "h-3 w-3 rounded-full shadow-sm",
-                    canDonate(profile.lastDonationDate) ? "bg-emerald-500" : "bg-red-500"
-                  )} />
+              {/* Large Display Typography */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-red-600 dark:text-red-500">
+                    Verified Donor Profile
+                  </span>
+                  <div className="h-[1px] flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                </div>
+                <h1 className="text-7xl lg:text-8xl font-black tracking-tighter leading-[0.85] uppercase">
+                  {profile.name.split(' ')[0]}
+                  <br />
+                  <span className="text-zinc-300 dark:text-zinc-800">{profile.name.split(' ').slice(1).join(' ')}</span>
                 </h1>
-                {profile.isVerified && (
-                  <div className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[10px] font-bold border border-blue-100 dark:border-blue-900/30">
-                    <CheckCircle className="h-2.5 w-2.5 fill-blue-600/10" />
-                    Verified
+              </div>
+
+              {/* Avatar with Editorial Mask */}
+              <div className="relative group max-w-sm">
+                <div className="aspect-[4/5] overflow-hidden rounded-[3rem] bg-zinc-100 dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800 transition-transform duration-700 group-hover:scale-[1.02]">
+                  {formData.photoURL ? (
+                    <img 
+                      src={formData.photoURL} 
+                      alt={profile.name} 
+                      className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <User size={120} className="text-zinc-200 dark:text-zinc-800" />
+                    </div>
+                  )}
+                  
+                  {/* Overlay Controls */}
+                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
+                    <label className="cursor-pointer bg-white text-black px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-red-600 hover:text-white transition-colors">
+                      <Camera size={14} />
+                      Update Portrait
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                    </label>
                   </div>
-                )}
-                {getBadge(profile.donationCount) && (
-                  <div className={cn(
-                    "flex items-center gap-1 px-2 py-0.5 bg-zinc-50 dark:bg-zinc-900/20 rounded-full text-[10px] font-bold border border-zinc-100 dark:border-zinc-800",
-                    getBadge(profile.donationCount)?.color
-                  )}>
-                    <span>{getBadge(profile.donationCount)?.icon}</span>
-                    {getBadge(profile.donationCount)?.name}
+                </div>
+
+                {/* AI Sparkle Action */}
+                <button
+                  onClick={generateAIAvatar}
+                  disabled={generatingAvatar}
+                  className="absolute -top-6 -right-6 w-20 h-20 bg-red-600 rounded-full flex items-center justify-center text-white shadow-2xl hover:scale-110 transition-transform active:scale-95 disabled:opacity-50"
+                >
+                  {generatingAvatar ? <Loader2 className="animate-spin" /> : <Sparkles size={28} />}
+                </button>
+
+                {uploading && (
+                  <div className="absolute inset-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center rounded-[3rem]">
+                    <Loader2 className="animate-spin text-red-600" size={40} />
                   </div>
                 )}
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">{profile.email}</p>
-            </div>
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="px-4 py-1.5 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
-            >
-              {isEditing ? t('cancel') : t('edit_profile')}
-            </button>
+
+              {/* Quick Stats Rail */}
+              <div className="grid grid-cols-3 gap-8 pt-8 border-t border-zinc-100 dark:border-zinc-900">
+                <div className="space-y-1">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Blood Type</div>
+                  <div className="text-3xl font-black text-red-600">{profile.bloodGroup || '??'}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Lives Saved</div>
+                  <div className="text-3xl font-black">{profile.donationCount}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Status</div>
+                  <div className="flex items-center gap-2">
+                    <div className={cn("h-2 w-2 rounded-full", canDonate(profile.lastDonationDate) ? "bg-emerald-500" : "bg-red-500")} />
+                    <span className="text-xs font-bold uppercase tracking-tighter">
+                      {canDonate(profile.lastDonationDate) ? 'Ready' : 'Resting'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
 
-          {isEditing ? (
-            <form onSubmit={handleUpdate} className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t('name')}</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t('phone')}</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t('blood_group')}</label>
-                <select
-                  value={formData.bloodGroup}
-                  onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
-                >
-                  <option value="">Select Group</option>
-                  {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t('division')}</label>
-                <select
-                  value={formData.division}
-                  onChange={(e) => setFormData({ ...formData, division: e.target.value, district: '' })}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
-                >
-                  <option value="">Select Division</option>
-                  {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t('district')}</label>
-                <select
-                  value={formData.district}
-                  onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                  disabled={!formData.division}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 disabled:opacity-50"
-                >
-                  <option value="">Select District</option>
-                  {availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t('upazila')}</label>
-                <input
-                  type="text"
-                  value={formData.upazila}
-                  onChange={(e) => setFormData({ ...formData, upazila: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t('weight')}</label>
-                <input
-                  type="number"
-                  value={formData.weight}
-                  onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t('height')}</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 5'8''"
-                  value={formData.height}
-                  onChange={(e) => setFormData({ ...formData, height: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t('last_donation')}</label>
-                <input
-                  type="date"
-                  value={formData.lastDonationDate}
-                  onChange={(e) => setFormData({ ...formData, lastDonationDate: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Medical History</label>
-                <textarea
-                  value={formData.medicalHistory}
-                  onChange={(e) => setFormData({ ...formData, medicalHistory: e.target.value })}
-                  placeholder="Any chronic conditions, allergies, or recent surgeries..."
-                  rows={3}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 resize-none"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Donation Preferences</label>
-                <textarea
-                  value={formData.donationPreferences}
-                  onChange={(e) => setFormData({ ...formData, donationPreferences: e.target.value })}
-                  placeholder="Preferred donation times, locations, or other preferences..."
-                  rows={3}
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 resize-none"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Profile Picture URL</label>
-                <input
-                  type="text"
-                  value={formData.photoURL}
-                  onChange={(e) => setFormData({ ...formData, photoURL: e.target.value })}
-                  placeholder="https://example.com/photo.jpg"
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600"
-                />
-              </div>
+          {/* Right Column: Details & Actions */}
+          <div className="lg:col-span-7 space-y-20">
+            
+            {/* Action Bar */}
+            <div className="flex flex-wrap items-center gap-4">
               <button
-                type="submit"
-                className="md:col-span-2 py-4 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all"
+                onClick={() => setIsEditing(!isEditing)}
+                className="px-10 py-5 bg-black dark:bg-white text-white dark:text-black rounded-full text-xs font-black uppercase tracking-[0.2em] hover:bg-red-600 dark:hover:bg-red-600 dark:hover:text-white transition-all shadow-2xl"
               >
-                {t('save_changes')}
+                {isEditing ? 'Discard Changes' : 'Edit Profile Details'}
               </button>
-            </form>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
-                <Droplets className="h-5 w-5 text-red-600" />
-                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('blood_group')}</div>
-                <div className="text-lg font-bold text-zinc-900 dark:text-white">{profile.bloodGroup || 'Not Set'}</div>
-              </div>
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
-                <MapPin className="h-5 w-5 text-blue-600" />
-                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('division')}</div>
-                <div className="text-base font-bold text-zinc-900 dark:text-white">{profile.division || 'Not Set'}</div>
-              </div>
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
-                <MapPin className="h-5 w-5 text-blue-600" />
-                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('district')}</div>
-                <div className="text-base font-bold text-zinc-900 dark:text-white">{profile.district || 'Not Set'}</div>
-              </div>
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
-                <Calendar className="h-5 w-5 text-emerald-600" />
-                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('last_donation')}</div>
-                <div className="text-base font-bold text-zinc-900 dark:text-white">
-                  {profile.donationCount > 0 ? (profile.lastDonationDate || 'Not Set') : 'Never'}
-                </div>
-              </div>
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
-                <Scale className="h-5 w-5 text-amber-600" />
-                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('weight')}</div>
-                <div className="text-base font-bold text-zinc-900 dark:text-white">{profile.weight ? `${profile.weight} kg` : 'Not Set'}</div>
-              </div>
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-1">
-                <Ruler className="h-5 w-5 text-purple-600" />
-                <div className="text-[10px] font-bold text-zinc-500 uppercase">{t('height')}</div>
-                <div className="text-base font-bold text-zinc-900 dark:text-white">{profile.height || 'Not Set'}</div>
-              </div>
+              <button 
+                onClick={() => {
+                  navigator.share({
+                    title: 'BloodTraking Profile',
+                    url: `${window.location.origin}/user/${profile.uid}`
+                  }).catch(() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/user/${profile.uid}`);
+                    toast.success('Link copied to clipboard');
+                  });
+                }}
+                className="w-16 h-16 rounded-full border border-zinc-200 dark:border-zinc-800 flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+              >
+                <Share2 size={20} />
+              </button>
             </div>
-          )}
 
-          {!isEditing && (profile.medicalHistory || profile.donationPreferences) && (
-            <div className="mt-6 space-y-4">
-              {profile.medicalHistory && (
-                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-2">
-                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Medical History</div>
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">{profile.medicalHistory}</p>
-                </div>
+            {/* Dynamic Content: Form or Display */}
+            <AnimatePresence mode="wait">
+              {isEditing ? (
+                <motion.div
+                  key="editing"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-zinc-50 dark:bg-zinc-900/50 rounded-[3rem] p-10 lg:p-16 border border-zinc-100 dark:border-zinc-800"
+                >
+                  <form onSubmit={handleUpdate} className="space-y-12">
+                    <div className="grid md:grid-cols-2 gap-x-12 gap-y-8">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Full Name</label>
+                        <input
+                          type="text"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          className="w-full bg-transparent border-b-2 border-zinc-200 dark:border-zinc-800 py-4 text-xl font-bold focus:border-red-600 outline-none transition-colors"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Phone Number</label>
+                        <input
+                          type="tel"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          className="w-full bg-transparent border-b-2 border-zinc-200 dark:border-zinc-800 py-4 text-xl font-bold focus:border-red-600 outline-none transition-colors"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Blood Group</label>
+                        <select
+                          value={formData.bloodGroup}
+                          onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
+                          className="w-full bg-transparent border-b-2 border-zinc-200 dark:border-zinc-800 py-4 text-xl font-bold focus:border-red-600 outline-none transition-colors appearance-none"
+                        >
+                          <option value="">Select</option>
+                          {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Last Donation</label>
+                        <input
+                          type="date"
+                          value={formData.lastDonationDate}
+                          onChange={(e) => setFormData({ ...formData, lastDonationDate: e.target.value })}
+                          className="w-full bg-transparent border-b-2 border-zinc-200 dark:border-zinc-800 py-4 text-xl font-bold focus:border-red-600 outline-none transition-colors"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Division</label>
+                        <select
+                          value={formData.division}
+                          onChange={(e) => setFormData({ ...formData, division: e.target.value, district: '' })}
+                          className="w-full bg-transparent border-b-2 border-zinc-200 dark:border-zinc-800 py-4 text-xl font-bold focus:border-red-600 outline-none transition-colors appearance-none"
+                        >
+                          <option value="">Select</option>
+                          {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">District</label>
+                        <select
+                          value={formData.district}
+                          onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                          disabled={!formData.division}
+                          className="w-full bg-transparent border-b-2 border-zinc-200 dark:border-zinc-800 py-4 text-xl font-bold focus:border-red-600 outline-none transition-colors appearance-none disabled:opacity-30"
+                        >
+                          <option value="">Select</option>
+                          {availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Upazila / Area</label>
+                        <input
+                          type="text"
+                          value={formData.upazila}
+                          onChange={(e) => setFormData({ ...formData, upazila: e.target.value })}
+                          className="w-full bg-transparent border-b-2 border-zinc-200 dark:border-zinc-800 py-4 text-xl font-bold focus:border-red-600 outline-none transition-colors"
+                          placeholder="Enter your upazila or area"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Weight (kg)</label>
+                        <input
+                          type="number"
+                          value={formData.weight}
+                          onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                          className="w-full bg-transparent border-b-2 border-zinc-200 dark:border-zinc-800 py-4 text-xl font-bold focus:border-red-600 outline-none transition-colors"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Height</label>
+                        <input
+                          type="text"
+                          value={formData.height}
+                          onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+                          className="w-full bg-transparent border-b-2 border-zinc-200 dark:border-zinc-800 py-4 text-xl font-bold focus:border-red-600 outline-none transition-colors"
+                          placeholder="e.g. 5ft 8in"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Medical History & Notes</label>
+                      <textarea
+                        value={formData.medicalHistory}
+                        onChange={(e) => setFormData({ ...formData, medicalHistory: e.target.value })}
+                        rows={4}
+                        className="w-full bg-white dark:bg-black/20 rounded-3xl p-8 text-lg font-medium border border-zinc-100 dark:border-zinc-800 focus:border-red-600 outline-none transition-colors resize-none"
+                        placeholder="Any relevant medical information..."
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-6 bg-red-600 text-white rounded-full text-sm font-black uppercase tracking-[0.3em] hover:bg-red-700 transition-all shadow-2xl shadow-red-600/20"
+                    >
+                      Commit Changes
+                    </button>
+                  </form>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="display"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-24"
+                >
+                  {/* Bio / About Section */}
+                  <section className="space-y-8">
+                    <h2 className="text-4xl font-black uppercase tracking-tighter">The Medical Record</h2>
+                    <div className="grid md:grid-cols-2 gap-12">
+                      <div className="space-y-6">
+                        <div className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-4">Location & Reach</div>
+                          <div className="flex items-center gap-4 text-xl font-bold">
+                            <MapPin className="text-red-600" />
+                            {profile.upazila ? `${profile.upazila}, ` : ''}{profile.district}, {profile.division}
+                          </div>
+                        </div>
+                        <div className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-4">Contact Protocol</div>
+                          <div className="flex items-center gap-4 text-xl font-bold">
+                            <Phone className="text-red-600" />
+                            {profile.phone || 'Not Provided'}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800">
+                            <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-4">Weight</div>
+                            <div className="flex items-center gap-4 text-xl font-bold">
+                              <Scale className="text-red-600" />
+                              {profile.weight ? `${profile.weight} kg` : 'N/A'}
+                            </div>
+                          </div>
+                          <div className="p-8 bg-zinc-50 dark:bg-zinc-900/50 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800">
+                            <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-4">Height</div>
+                            <div className="flex items-center gap-4 text-xl font-bold">
+                              <Ruler className="text-red-600" />
+                              {profile.height || 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-10 bg-black text-white rounded-[2.5rem] flex flex-col justify-between">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-8">Medical History</div>
+                        <p className="text-lg font-medium leading-relaxed italic">
+                          "{profile.medicalHistory || 'No medical history recorded for this donor.'}"
+                        </p>
+                        <div className="mt-8 flex justify-end">
+                          <Shield className="text-red-600" size={32} />
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Impact & History: Horizontal Scroll or Grid */}
+                  <section className="space-y-12">
+                    <div className="flex items-end justify-between">
+                      <h2 className="text-4xl font-black uppercase tracking-tighter">Donation Timeline</h2>
+                      <span className="text-xs font-black uppercase tracking-widest text-red-600">{profile.donationCount} Entries</span>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      {profile.donationCount > 0 ? (
+                        [...Array(profile.donationCount)].map((_, i) => (
+                          <div key={i} className="group flex items-center justify-between p-8 bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 hover:border-red-600 transition-all">
+                            <div className="flex items-center gap-8">
+                              <div className="text-5xl font-black text-zinc-100 dark:text-zinc-800 group-hover:text-red-600/10 transition-colors">
+                                0{i + 1}
+                              </div>
+                              <div>
+                                <div className="text-xl font-black uppercase tracking-tight">Full Blood Donation</div>
+                                <div className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Regional Medical Center</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-black">
+                                {new Date(new Date().getTime() - (i + 1) * 95 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                              </div>
+                              <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Verified</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="py-20 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-[3rem]">
+                          <p className="text-zinc-400 font-black uppercase tracking-widest">No history recorded yet</p>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  {/* QR & Share: Editorial Card */}
+                  <section className="bg-red-600 rounded-[4rem] p-12 lg:p-20 text-white flex flex-col lg:flex-row items-center gap-16 overflow-hidden relative">
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl" />
+                    
+                    <div className="p-6 bg-white rounded-[3rem] shadow-2xl shrink-0 rotate-3 hover:rotate-0 transition-transform duration-500">
+                      <QRCodeSVG 
+                        value={`${window.location.origin}/user/${profile.uid}`}
+                        size={200}
+                        level="H"
+                        includeMargin={true}
+                      />
+                    </div>
+
+                    <div className="space-y-8 relative z-10">
+                      <div className="space-y-4">
+                        <h2 className="text-5xl lg:text-6xl font-black uppercase tracking-tighter leading-none">
+                          Digital Donor <br /> Passport
+                        </h2>
+                        <p className="text-red-100 text-lg font-medium max-w-md">
+                          Your unique identifier for instant verification at any participating medical facility.
+                        </p>
+                      </div>
+                      <div className="flex gap-4">
+                        <button className="px-8 py-4 bg-white text-red-600 rounded-full text-xs font-black uppercase tracking-widest hover:bg-zinc-100 transition-colors">
+                          Download PNG
+                        </button>
+                        <button className="w-14 h-14 rounded-full border border-white/30 flex items-center justify-center hover:bg-white/10 transition-colors">
+                          <Zap size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Feedback: Minimalist Form */}
+                  <section className="space-y-8 pt-12 border-t border-zinc-100 dark:border-zinc-900">
+                    <div className="max-w-xl">
+                      <h2 className="text-2xl font-black uppercase tracking-widest mb-4">Platform Feedback</h2>
+                      <p className="text-zinc-500 font-medium mb-8">Help us refine the BloodTraking experience. Your insights drive our evolution.</p>
+                      
+                      <form onSubmit={handleFeedbackSubmit} className="space-y-6">
+                        <textarea
+                          value={feedback}
+                          onChange={(e) => setFeedback(e.target.value)}
+                          placeholder="What can we improve?"
+                          rows={3}
+                          className="w-full bg-transparent border-b-2 border-zinc-200 dark:border-zinc-800 py-4 text-lg font-medium focus:border-red-600 outline-none transition-colors resize-none"
+                        />
+                        <button
+                          type="submit"
+                          disabled={submittingFeedback || !feedback.trim()}
+                          className="flex items-center gap-4 text-xs font-black uppercase tracking-[0.3em] hover:text-red-600 transition-colors disabled:opacity-30"
+                        >
+                          {submittingFeedback ? 'Submitting...' : 'Send Message'}
+                          <ArrowRight size={16} />
+                        </button>
+                      </form>
+                    </div>
+                  </section>
+                </motion.div>
               )}
-              {profile.donationPreferences && (
-                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl space-y-2">
-                  <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Donation Preferences</div>
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">{profile.donationPreferences}</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </motion.div>
-
-      {/* Stats & Badges */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-4">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <Shield className="h-4 w-4 text-red-600" />
-            Impact
-          </h3>
-          <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/10 rounded-xl">
-            <div className="space-y-0.5">
-              <div className="text-xl font-bold text-red-600">{profile.donationCount}</div>
-              <div className="text-[10px] font-medium text-zinc-500">Donations</div>
-            </div>
-            <div className="h-8 w-8 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
-              <Heart className="h-4 w-4 text-red-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-4">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <User className="h-4 w-4 text-emerald-600" />
-            Social
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl text-center">
-              <div className="text-xl font-bold text-emerald-600">{profile.followers?.length || 0}</div>
-              <div className="text-[10px] font-medium text-zinc-500 uppercase">Followers</div>
-            </div>
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl text-center">
-              <div className="text-xl font-bold text-blue-600">{profile.following?.length || 0}</div>
-              <div className="text-[10px] font-medium text-zinc-500 uppercase">Following</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-4">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <Phone className="h-4 w-4 text-blue-600" />
-            Contact
-          </h3>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Phone className="h-3.5 w-3.5 text-zinc-400" />
-              <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium truncate">{profile.phone || 'No phone'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <User className="h-3.5 w-3.5 text-zinc-400" />
-              <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium capitalize truncate">{profile.role}</span>
-            </div>
+            </AnimatePresence>
           </div>
         </div>
       </div>
 
-      {/* QR Code Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-100 dark:border-zinc-800 shadow-xl flex flex-col md:flex-row items-center gap-8"
-      >
-        <div className="p-4 bg-white rounded-2xl shadow-inner border border-zinc-100">
-          <QRCodeSVG 
-            value={`${window.location.origin}/user/${profile.uid}`}
-            size={160}
-            level="H"
-            includeMargin={true}
-            imageSettings={{
-              src: "/logo.png",
-              x: undefined,
-              y: undefined,
-              height: 24,
-              width: 24,
-              excavate: true,
-            }}
-          />
-        </div>
-        <div className="flex-1 text-center md:text-left space-y-3">
-          <div className="flex items-center justify-center md:justify-start gap-2 text-red-600">
-            <QrCode className="h-5 w-5" />
-            <h3 className="text-xl font-bold">Your Personal QR Code</h3>
-          </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md">
-            This QR code links directly to your public profile. Other donors can scan this to quickly find your contact information and blood group.
-          </p>
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
-            <button 
-              onClick={() => {
-                const canvas = document.querySelector('canvas');
-                if (canvas) {
-                  const url = canvas.toDataURL('image/png');
-                  const link = document.createElement('a');
-                  link.download = `bloodtraking-qr-${profile.name}.png`;
-                  link.href = url;
-                  link.click();
-                } else {
-                  // Fallback for SVG
-                  const svg = document.querySelector('svg[role="img"]');
-                  if (svg) {
-                    const svgData = new XMLSerializer().serializeToString(svg);
-                    const canvas = document.createElement("canvas");
-                    const ctx = canvas.getContext("2d");
-                    const img = new Image();
-                    img.onload = () => {
-                      canvas.width = img.width;
-                      canvas.height = img.height;
-                      ctx?.drawImage(img, 0, 0);
-                      const pngFile = canvas.toDataURL("image/png");
-                      const downloadLink = document.createElement("a");
-                      downloadLink.download = `bloodtraking-qr-${profile.name}.png`;
-                      downloadLink.href = pngFile;
-                      downloadLink.click();
-                    };
-                    img.src = "data:image/svg+xml;base64," + btoa(svgData);
-                  }
-                }
-              }}
-              className="px-6 py-2 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all"
-            >
-              Download QR
-            </button>
-            <button 
-              onClick={() => {
-                navigator.share({
-                  title: 'My BloodTraking Profile',
-                  text: `Check out my blood donor profile on BloodTraking!`,
-                  url: `${window.location.origin}/user/${profile.uid}`
-                }).catch(() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/user/${profile.uid}`);
-                  toast.success('Profile link copied!');
-                });
-              }}
-              className="px-6 py-2 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
-            >
-              Share Profile
-            </button>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Share & Invite */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-red-600 rounded-2xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-red-600/20"
-      >
-        <div className="space-y-2 text-center md:text-left">
-          <h3 className="text-xl font-bold flex items-center justify-center md:justify-start gap-2">
-            <Share2 className="h-5 w-5" />
-            Invite Your Friends
-          </h3>
-          <p className="text-sm text-red-100 max-w-md">
-            Help us save more lives by inviting your friends and family to join the BloodTraking community.
-          </p>
-        </div>
-        <Link 
-          to="/invite"
-          className="px-8 py-3 bg-white text-red-600 rounded-xl font-bold hover:bg-red-50 transition-all shadow-lg"
-        >
-          Get Invite Link
-        </Link>
-      </motion.div>
-
-      {/* Donation History */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-xl overflow-hidden"
-      >
-        <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-red-600" />
-            History
-          </h3>
-          <button className="text-xs font-bold text-red-600 hover:underline">Add Record</button>
-        </div>
-        <div className="p-4">
-          {profile.donationCount > 0 ? (
-            <div className="space-y-3">
-              {/* Simulated history */}
-              {[...Array(profile.donationCount)].map((_, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
-                      <Droplets className="h-4 w-4 text-red-600" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-xs">Blood Donation</div>
-                      <div className="text-[10px] text-zinc-500">Hospital General</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-xs text-zinc-900 dark:text-white">
-                      {new Date(new Date().getTime() - (i + 1) * 95 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                    </div>
-                    <div className="text-[9px] font-bold text-emerald-600 uppercase">Done</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 space-y-2">
-              <div className="h-12 w-12 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto">
-                <Calendar className="h-6 w-6 text-zinc-300" />
-              </div>
-              <p className="text-xs text-zinc-500 font-medium">No records found.</p>
-            </div>
-          )}
-        </div>
-      </motion.div>
-
-      {/* App Feedback Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-xl overflow-hidden"
-      >
-        <div className="p-4 border-b border-zinc-100 dark:border-zinc-800">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <MessageSquare className="h-4 w-4 text-blue-600" />
-            App Feedback
-          </h3>
-          <p className="text-xs text-zinc-500 mt-1">Help us improve BloodTraking by sharing your thoughts or reporting issues.</p>
-        </div>
-        <div className="p-4">
-          <form onSubmit={handleFeedbackSubmit} className="space-y-3">
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              placeholder="What do you like? What could be better? Found a bug?"
-              rows={4}
-              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-600 resize-none text-sm"
-              required
-            />
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={submittingFeedback || !feedback.trim()}
-                className="px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center gap-2"
-              >
-                {submittingFeedback ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  'Submit Feedback'
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      </motion.div>
       {/* AI Avatar Preview Modal */}
-      {previewAvatar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-sm w-full space-y-6 shadow-2xl border border-zinc-100 dark:border-zinc-800"
-          >
-            <div className="text-center space-y-2">
-              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">AI Avatar Generated!</h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Here is your unique avatar based on your profile. Would you like to set it as your profile picture?
-              </p>
-            </div>
-
-            <div className="relative aspect-square rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 ring-4 ring-white dark:ring-zinc-800 shadow-lg">
-              <img 
-                src={previewAvatar} 
-                alt="AI Generated Avatar" 
-                className="w-full h-full object-cover"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={cancelAvatarPreview}
-                disabled={uploading}
-                className="px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveGeneratedAvatar}
-                disabled={uploading}
-                className="px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4" />
-                    Save Avatar
-                  </>
-                )}
-              </button>
-            </div>
-            
-            <button
-              onClick={generateAIAvatar}
-              disabled={uploading || generatingAvatar}
-              className="w-full py-2 text-sm font-medium text-zinc-500 hover:text-red-600 transition-colors flex items-center justify-center gap-1"
+      <AnimatePresence>
+        {previewAvatar && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 40 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 40 }}
+              className="bg-white dark:bg-zinc-900 rounded-[4rem] p-12 max-w-lg w-full space-y-12 shadow-2xl overflow-hidden relative"
             >
-              <Sparkles className="h-3 w-3" />
-              Generate New One
-            </button>
-          </motion.div>
-        </div>
-      )}
+              <div className="absolute top-0 left-0 w-full h-2 bg-red-600" />
+              
+              <div className="text-center space-y-4">
+                <h3 className="text-4xl font-black uppercase tracking-tighter">AI Portrait Ready</h3>
+                <p className="text-zinc-500 font-medium">
+                  A unique visual identity generated from your donor profile data.
+                </p>
+              </div>
+
+              <div className="relative aspect-[4/5] rounded-[3rem] overflow-hidden bg-zinc-100 dark:bg-zinc-800 ring-1 ring-zinc-200 dark:ring-zinc-800 shadow-2xl">
+                <img 
+                  src={previewAvatar} 
+                  alt="AI Generated Avatar" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={cancelAvatarPreview}
+                  disabled={uploading}
+                  className="py-6 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={saveGeneratedAvatar}
+                  disabled={uploading}
+                  className="py-6 bg-red-600 text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-xl shadow-red-600/20 flex items-center justify-center gap-2"
+                >
+                  {uploading ? <Loader2 className="animate-spin" /> : 'Apply Portrait'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

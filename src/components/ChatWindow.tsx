@@ -8,6 +8,7 @@ import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase/config';
 import { toast } from 'react-hot-toast';
+import { cn } from '../utils/helpers';
 
 interface ChatWindowProps {
   roomId: string;
@@ -64,6 +65,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
           setCurrentTheme(data.theme);
         }
       }
+    }, (error) => {
+      console.error("Error fetching room theme:", error);
     });
     return () => unsubscribe();
   }, [roomId]);
@@ -91,6 +94,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
       updateDoc(doc(db, 'chatRooms', roomId), {
         [`unreadCount.${user.uid}`]: 0
       });
+    }, (error) => {
+      console.error("Error fetching messages:", error);
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -216,11 +222,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
       {/* Messages Area */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth"
+        className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth"
       >
         {loading ? (
-          <div className="flex justify-center py-10">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600"></div>
+          <div className="flex flex-col items-center justify-center h-full space-y-4">
+            <div className="h-10 w-10 border-4 border-red-600/20 border-t-red-600 rounded-full animate-spin" />
+            <p className="text-zinc-500 font-bold animate-pulse">Loading messages...</p>
           </div>
         ) : messages.length > 0 ? (
           messages.map((msg, index) => {
@@ -230,65 +237,68 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
             const isEditing = editingMessageId === msg.id;
 
             return (
-              <div key={msg.id} className="space-y-1 group">
+              <div key={msg.id} className="space-y-2 group">
                 {showTime && msg.createdAt && (
-                  <div className="text-center py-4">
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                  <div className="flex items-center gap-4 py-4">
+                    <div className="flex-1 h-px bg-zinc-100 dark:bg-zinc-800" />
+                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
                       {msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
+                    <div className="flex-1 h-px bg-zinc-100 dark:bg-zinc-800" />
                   </div>
                 )}
-                <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2`}>
+                <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-3`}>
                   {/* Edit/Delete Actions (Left side for Me) */}
                   {isMe && !isEditing && (
-                    <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex flex-col gap-1 mb-1">
+                    <div className="opacity-0 group-hover:opacity-100 transition-all flex flex-col gap-1 mb-1 scale-90 group-hover:scale-100">
                       <button 
                         onClick={() => { setEditingMessageId(msg.id); setEditText(msg.text || ''); }}
-                        className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors shadow-sm"
+                        className="p-2 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all shadow-sm border border-zinc-100 dark:border-zinc-700"
                         title="Edit"
                       >
-                        <Edit2 size={14} />
+                        <Edit2 size={12} />
                       </button>
                       <button 
                         onClick={(e) => handleDeleteMessage(msg.id, e)}
-                        className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shadow-sm"
+                        className="p-2 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all shadow-sm border border-zinc-100 dark:border-zinc-700"
                         title="Delete"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={12} />
                       </button>
                     </div>
                   )}
 
-                  <div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${
+                  <div className={cn(
+                    "max-w-[80%] p-4 rounded-[1.5rem] text-sm shadow-sm transition-all",
                     isMe 
-                      ? `${activeTheme.color} text-white rounded-tr-none` 
-                      : 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-tl-none border border-zinc-100 dark:border-zinc-700'
-                  }`}>
+                      ? `${activeTheme.color} text-white rounded-br-none shadow-xl ${activeTheme.shadow}` 
+                      : 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-bl-none border border-zinc-100 dark:border-zinc-700'
+                  )}>
                     {msg.mediaUrl && !isEditing && (
-                      <div className="mb-2 rounded-xl overflow-hidden bg-black/5">
+                      <div className="mb-3 rounded-2xl overflow-hidden bg-black/5 ring-1 ring-black/10">
                         {msg.mediaType === 'image' ? (
                           <img 
                             src={msg.mediaUrl} 
                             alt="Shared photo" 
-                            className="max-h-60 w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                            className="max-h-80 w-full object-cover cursor-pointer hover:scale-105 transition-transform"
                             onClick={() => window.open(msg.mediaUrl, '_blank')}
                           />
                         ) : (
                           <video 
                             src={msg.mediaUrl} 
                             controls 
-                            className="max-h-60 w-full"
+                            className="max-h-80 w-full"
                           />
                         )}
                       </div>
                     )}
                     
                     {isEditing ? (
-                      <div className="min-w-[200px]">
+                      <div className="min-w-[240px] space-y-3">
                         <textarea 
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
-                          className="w-full p-2 bg-black/10 dark:bg-white/10 rounded-lg outline-none text-inherit resize-none placeholder-white/50"
+                          className="w-full p-3 bg-black/10 dark:bg-white/10 rounded-xl outline-none text-inherit resize-none placeholder-white/50 border border-white/10"
                           rows={3}
                           autoFocus
                           placeholder="Edit message..."
@@ -301,37 +311,42 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
                             }
                           }}
                         />
-                        <div className="flex justify-end gap-2 mt-2">
+                        <div className="flex justify-end gap-2">
                           <button 
                             onClick={() => setEditingMessageId(null)} 
-                            className="p-1.5 hover:bg-black/10 rounded-lg transition-colors"
-                            title="Cancel"
+                            className="p-2 hover:bg-black/10 rounded-xl transition-colors flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
                           >
                             <X size={14} />
+                            Cancel
                           </button>
                           <button 
                             onClick={() => handleUpdateMessage(msg.id)} 
-                            className="p-1.5 hover:bg-black/10 rounded-lg transition-colors"
-                            title="Save"
+                            className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
                           >
                             <Check size={14} />
+                            Save
                           </button>
                         </div>
                       </div>
                     ) : (
                       <>
                         {msg.text && (
-                          <p className="leading-relaxed whitespace-pre-wrap">
+                          <p className="leading-relaxed whitespace-pre-wrap font-medium">
                             {msg.text}
-                            {msg.isEdited && <span className="text-[10px] opacity-70 italic ml-1">(edited)</span>}
+                            {msg.isEdited && <span className="text-[10px] opacity-60 italic ml-2 font-black uppercase tracking-widest">(edited)</span>}
                           </p>
                         )}
-                        <div className={`flex items-center gap-1 mt-1 justify-end ${isMe ? activeTheme.text : 'text-zinc-400'}`}>
-                          <span className="text-[9px]">
+                        <div className={cn(
+                          "flex items-center gap-1.5 mt-2 justify-end",
+                          isMe ? activeTheme.text : 'text-zinc-400'
+                        )}>
+                          <span className="text-[9px] font-black tracking-widest uppercase">
                             {msg.createdAt ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'}
                           </span>
                           {isMe && (
-                            msg.read ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
+                            msg.read 
+                              ? <CheckCheck className="h-3.5 w-3.5 text-white" /> 
+                              : <Check className="h-3.5 w-3.5 opacity-60" />
                           )}
                         </div>
                       </>
@@ -342,41 +357,44 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
             );
           })
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-50">
-            <div className="h-16 w-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center">
-              <MessageSquare className="h-8 w-8 text-zinc-300" />
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
+            <div className="h-24 w-24 bg-white dark:bg-zinc-800 rounded-[2rem] flex items-center justify-center shadow-xl border border-zinc-100 dark:border-zinc-700 rotate-12">
+              <MessageSquare className="h-10 w-10 text-red-600 -rotate-12" />
             </div>
-            <p className="text-sm font-medium">Say hello to start the conversation!</p>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-zinc-900 dark:text-white">No Messages Yet</h3>
+              <p className="text-sm font-medium text-zinc-500 max-w-[200px] mx-auto">Say hello to start the conversation with this donor!</p>
+            </div>
           </div>
         )}
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 relative">
+      <div className="p-6 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 relative">
         <AnimatePresence>
           {attachedFile && (
             <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-full left-4 mb-4 p-2 bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-700 flex items-center gap-3"
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="absolute bottom-full left-6 right-6 mb-6 p-3 bg-white dark:bg-zinc-800 rounded-[2rem] shadow-2xl border border-zinc-100 dark:border-zinc-700 flex items-center gap-4"
             >
-              <div className="h-12 w-12 bg-zinc-100 dark:bg-zinc-700 rounded-xl overflow-hidden flex items-center justify-center">
+              <div className="h-14 w-14 bg-zinc-100 dark:bg-zinc-700 rounded-2xl overflow-hidden flex items-center justify-center ring-1 ring-black/5">
                 {attachedFile.type === 'image' ? (
                   <img src={URL.createObjectURL(attachedFile.file)} className="h-full w-full object-cover" />
                 ) : (
-                  <Video className="h-6 w-6 text-zinc-400" />
+                  <Video className="h-6 w-6 text-red-600" />
                 )}
               </div>
-              <div className="flex-1 min-w-0 pr-2">
-                <p className="text-xs font-bold truncate">{attachedFile.file.name}</p>
-                <p className="text-[10px] text-zinc-500 uppercase">{attachedFile.type}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-zinc-900 dark:text-white truncate">{attachedFile.file.name}</p>
+                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">{attachedFile.type}</p>
               </div>
               <button 
                 onClick={() => setAttachedFile(null)}
-                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-full"
+                className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition-colors"
               >
-                <X className="h-4 w-4 text-zinc-400" />
+                <X className="h-5 w-5 text-zinc-400" />
               </button>
             </motion.div>
           )}
@@ -386,11 +404,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
           {showEmojiPicker && (
             <div 
               ref={emojiPickerRef}
-              className="absolute bottom-full left-4 mb-4 z-50"
+              className="absolute bottom-full left-6 mb-6 z-50 shadow-2xl rounded-3xl overflow-hidden border border-zinc-100 dark:border-zinc-700"
             >
               <EmojiPicker 
                 onEmojiClick={onEmojiClick}
                 theme={document.documentElement.classList.contains('dark') ? Theme.DARK : Theme.LIGHT}
+                width={320}
+                height={400}
               />
             </div>
           )}
@@ -400,22 +420,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
           {showThemePicker && (
             <div 
               ref={themePickerRef}
-              className="absolute bottom-full right-4 mb-4 z-50 bg-white dark:bg-zinc-800 rounded-xl shadow-xl border border-zinc-100 dark:border-zinc-700 p-3 grid grid-cols-3 gap-2"
+              className="absolute bottom-full right-6 mb-6 z-50 bg-white dark:bg-zinc-800 rounded-[2rem] shadow-2xl border border-zinc-100 dark:border-zinc-700 p-4 grid grid-cols-3 gap-3"
             >
               {THEMES.map(theme => (
                 <button
                   key={theme.name}
                   onClick={() => handleThemeChange(theme.name)}
-                  className={`w-8 h-8 rounded-full ${theme.color} hover:opacity-80 transition-opacity ${currentTheme === theme.name ? 'ring-2 ring-offset-2 ring-zinc-400 dark:ring-zinc-500' : ''}`}
+                  className={cn(
+                    "w-10 h-10 rounded-2xl transition-all flex items-center justify-center",
+                    theme.color,
+                    currentTheme === theme.name ? "ring-4 ring-zinc-100 dark:ring-zinc-700 scale-110" : "hover:scale-105"
+                  )}
                   title={theme.name}
-                />
+                >
+                  {currentTheme === theme.name && <Check className="h-5 w-5 text-white" />}
+                </button>
               ))}
             </div>
           )}
         </AnimatePresence>
 
-        <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-          <div className={`flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl flex flex-col transition-all ${activeTheme.ring}`}>
+        <form onSubmit={handleSendMessage} className="flex items-end gap-3">
+          <div className={cn(
+            "flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-[2rem] flex flex-col transition-all focus-within:bg-white dark:focus-within:bg-zinc-800 focus-within:shadow-xl focus-within:shadow-zinc-900/5",
+            activeTheme.ring
+          )}>
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
@@ -427,7 +456,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
               }}
               placeholder="Type a message..."
               rows={1}
-              className="w-full px-4 py-3 bg-transparent outline-none text-sm resize-none max-h-32"
+              className="w-full px-6 py-4 bg-transparent outline-none text-sm resize-none max-h-40 font-medium"
               style={{ height: 'auto' }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
@@ -435,25 +464,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
                 target.style.height = `${target.scrollHeight}px`;
               }}
             />
-            <div className="flex items-center gap-1 px-2 pb-2">
+            <div className="flex items-center gap-1 px-4 pb-3">
               <button
                 type="button"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+                className="p-2.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
               >
                 <Smile className="h-5 w-5" />
               </button>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+                className="p-2.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
               >
                 <Paperclip className="h-5 w-5" />
               </button>
               <button
                 type="button"
                 onClick={() => setShowThemePicker(!showThemePicker)}
-                className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+                className="p-2.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
               >
                 <Palette className="h-5 w-5" />
               </button>
@@ -469,9 +498,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
           <button
             type="submit"
             disabled={(!newMessage.trim() && !attachedFile) || uploading}
-            className={`p-3.5 ${activeTheme.color} text-white rounded-2xl ${activeTheme.hover} transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${activeTheme.shadow} flex-shrink-0`}
+            className={cn(
+              "h-[56px] w-[56px] flex items-center justify-center rounded-[1.5rem] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl flex-shrink-0",
+              activeTheme.color,
+              activeTheme.hover,
+              activeTheme.shadow
+            )}
           >
-            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+            {uploading ? <Loader2 className="h-6 w-6 animate-spin text-white" /> : <Send className="h-6 w-6 text-white" />}
           </button>
         </form>
       </div>

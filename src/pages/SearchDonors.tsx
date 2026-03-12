@@ -243,16 +243,20 @@ END:VCARD`;
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">{t('find_donor')}</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto">
+    <div className="max-w-7xl mx-auto px-4 py-12 space-y-12">
+      <div className="text-center space-y-4">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-full text-[10px] font-bold tracking-widest uppercase border border-red-100 dark:border-red-900/30">
+          <Droplets className="h-3 w-3" />
+          Donor Directory
+        </div>
+        <h1 className="text-4xl md:text-5xl font-black tracking-tight text-zinc-900 dark:text-white leading-none">{t('find_donor')}</h1>
+        <p className="text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto font-medium">
           Search for verified blood donors in your area.
         </p>
       </div>
 
       {/* Prominent Search Fields */}
-      <div className="max-w-xl mx-auto space-y-4">
+      <div className="max-w-2xl mx-auto grid md:grid-cols-2 gap-4">
         {/* Name Search */}
         <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -260,10 +264,10 @@ END:VCARD`;
           </div>
           <input
             type="text"
-            placeholder="Search donor by name"
+            placeholder="Search by name"
             value={filters.nameSearch}
             onChange={(e) => setFilters({ ...filters, nameSearch: e.target.value })}
-            className="w-full pl-12 pr-4 py-4 bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-2xl outline-none focus:border-red-600 dark:focus:border-red-600 shadow-sm text-lg transition-all"
+            className="input-field pl-12 py-4 text-base"
           />
           {filters.nameSearch && (
             <button
@@ -282,10 +286,10 @@ END:VCARD`;
           </div>
           <input
             type="text"
-            placeholder="Search donor by phone number (e.g. 01XXXXXXXXX)"
+            placeholder="Search by phone"
             value={filters.phoneSearch}
             onChange={(e) => setFilters({ ...filters, phoneSearch: e.target.value })}
-            className="w-full pl-12 pr-4 py-4 bg-white dark:bg-zinc-900 border-2 border-zinc-100 dark:border-zinc-800 rounded-2xl outline-none focus:border-red-600 dark:focus:border-red-600 shadow-sm text-lg transition-all"
+            className="input-field pl-12 py-4 text-base"
           />
           {filters.phoneSearch && (
             <button
@@ -299,151 +303,161 @@ END:VCARD`;
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-800 space-y-4">
+      <div className="card !p-6 space-y-6">
         <button 
           onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-          className="w-full flex justify-between items-center text-zinc-900 dark:text-white font-bold"
+          className="w-full flex justify-between items-center text-zinc-900 dark:text-white"
         >
-          <span>Filters</span>
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center">
+              <SearchIcon className="h-4 w-4 text-red-600" />
+            </div>
+            <span className="font-black text-sm uppercase tracking-widest">Advanced Filters</span>
+          </div>
           {isFiltersOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
         </button>
         
         {isFiltersOpen && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 items-end pt-4 border-t border-zinc-100 dark:border-zinc-800">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('blood_group')}</label>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 items-end pt-6 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="space-y-2">
+              <label className="label-text ml-1">{t('blood_group')}</label>
               <select
                 value={filters.bloodGroup}
                 onChange={(e) => setFilters({ ...filters, bloodGroup: e.target.value })}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                className="input-field py-2.5 text-xs"
               >
-                <option value="">All</option>
+                <option value="">All Groups</option>
                 {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('division')}</label>
+            <div className="space-y-2">
+              <label className="label-text ml-1">{t('division')}</label>
               <select
                 value={filters.division}
                 onChange={(e) => setFilters({ ...filters, division: e.target.value, district: '' })}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                className="input-field py-2.5 text-xs"
               >
-                <option value="">All</option>
+                <option value="">All Divisions</option>
                 {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{t('district')}</label>
+            <div className="space-y-2">
+              <label className="label-text ml-1">{t('district')}</label>
               <select
                 value={filters.district}
                 onChange={(e) => setFilters({ ...filters, district: e.target.value })}
                 disabled={!filters.division}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 disabled:opacity-50 text-sm"
+                className="input-field py-2.5 text-xs"
               >
-                <option value="">All</option>
+                <option value="">All Districts</option>
                 {availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Availability</label>
+            <div className="space-y-2">
+              <label className="label-text ml-1">Availability</label>
               <select
                 value={filters.availability}
                 onChange={(e) => setFilters({ ...filters, availability: e.target.value })}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                className="input-field py-2.5 text-xs"
               >
-                <option value="all">All</option>
+                <option value="all">Any Availability</option>
                 <option value="available">Available Only</option>
                 <option value="unavailable">Unavailable</option>
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Donation Status</label>
+            <div className="space-y-2">
+              <label className="label-text ml-1">Status</label>
               <select
                 value={filters.donationStatus}
                 onChange={(e) => setFilters({ ...filters, donationStatus: e.target.value })}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                className="input-field py-2.5 text-xs"
               >
-                <option value="all">Any Time</option>
-                <option value="ready">Ready to Donate (4+ months)</option>
+                <option value="all">Any Status</option>
+                <option value="ready">Ready (4+ months)</option>
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Radius (km)</label>
+            <div className="space-y-2">
+              <label className="label-text ml-1">Radius (km)</label>
               <select
                 value={filters.radius}
                 onChange={(e) => setFilters({ ...filters, radius: Number(e.target.value) })}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-red-600 text-sm"
+                className="input-field py-2.5 text-xs"
               >
-                <option value={0}>Any</option>
+                <option value={0}>Any Distance</option>
                 <option value={5}>5 km</option>
                 <option value={10}>10 km</option>
                 <option value={20}>20 km</option>
                 <option value={50}>50 km</option>
               </select>
             </div>
-            {profile && (
-              <div className="space-y-1 flex flex-col justify-end pb-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={filters.sortByProximity}
-                    onChange={(e) => setFilters({ ...filters, sortByProximity: e.target.checked })}
-                    className="rounded text-red-600 focus:ring-red-600 bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
-                  />
-                  <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Sort by Proximity</span>
-                </label>
-              </div>
-            )}
             <button
               onClick={fetchDonors}
-              className="py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2 text-sm"
+              className="btn-primary py-3 text-xs"
             >
               <SearchIcon className="h-4 w-4" />
-              {t('find_donor')}
+              Search
             </button>
           </div>
         )}
 
-        <div className="flex justify-center border-t border-zinc-100 dark:border-zinc-800 pt-4">
-          <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 border-t border-zinc-100 dark:border-zinc-800 pt-6">
+          <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-2xl">
             <button
               onClick={() => setViewMode('grid')}
               className={cn(
-                "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                "flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-black transition-all uppercase tracking-widest",
                 viewMode === 'grid' ? "bg-white dark:bg-zinc-700 text-red-600 shadow-sm" : "text-zinc-500"
               )}
             >
-              <LayoutGrid className="h-3.5 w-3.5" />
+              <LayoutGrid className="h-4 w-4" />
               Grid
             </button>
             <button
               onClick={() => setViewMode('map')}
               className={cn(
-                "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                "flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-black transition-all uppercase tracking-widest",
                 viewMode === 'map' ? "bg-white dark:bg-zinc-700 text-red-600 shadow-sm" : "text-zinc-500"
               )}
             >
-              <MapIcon className="h-3.5 w-3.5" />
+              <MapIcon className="h-4 w-4" />
               Map
             </button>
           </div>
+
+          {profile && (
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={filters.sortByProximity}
+                  onChange={(e) => setFilters({ ...filters, sortByProximity: e.target.checked })}
+                  className="peer sr-only"
+                />
+                <div className="w-10 h-6 bg-zinc-200 dark:bg-zinc-800 rounded-full peer-checked:bg-red-600 transition-colors" />
+                <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+              </div>
+              <span className="text-xs font-black text-zinc-500 uppercase tracking-widest group-hover:text-red-600 transition-colors">Sort by Proximity</span>
+            </label>
+          )}
         </div>
       </div>
 
       {/* Results */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <div className="flex flex-col items-center justify-center py-32 space-y-4">
+          <div className="h-12 w-12 border-4 border-red-600/20 border-t-red-600 rounded-full animate-spin" />
+          <p className="text-zinc-500 font-bold animate-pulse">Searching for donors...</p>
         </div>
       ) : viewMode === 'map' ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
+          className="rounded-[3rem] overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-2xl"
         >
           <DonorMap donors={donors} onDonorSelect={(donor) => navigate(`/user/${donor.uid}`)} />
         </motion.div>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {donors.length > 0 ? donors.map((donor, index) => (
             <motion.div
               key={donor.uid}
@@ -451,135 +465,97 @@ END:VCARD`;
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
               onClick={() => navigate(`/user/${donor.uid}`)}
-              className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all space-y-4 cursor-pointer group"
+              className="card group cursor-pointer hover:border-red-600/30 transition-all flex flex-col"
             >
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3">
-                  <div className="h-11 w-11 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-14 w-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center ring-4 ring-white dark:ring-zinc-900 shadow-sm group-hover:scale-110 transition-transform overflow-hidden">
                     {donor.photoURL ? (
-                      <img src={donor.photoURL} alt={donor.name} className="h-full w-full rounded-xl object-cover" />
+                      <img src={donor.photoURL} alt={donor.name} className="h-full w-full object-cover" />
                     ) : (
-                      <User className="h-6 w-6 text-zinc-400" />
+                      <User className="h-7 w-7 text-zinc-400" />
                     )}
                   </div>
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="font-bold text-sm text-zinc-900 dark:text-white">
-                          {donor.name}
-                        </h3>
-                        {donor.isVerified && (
-                          <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[8px] font-bold border border-blue-100 dark:border-blue-900/30">
-                            <CheckCircle className="h-2.5 w-2.5 fill-blue-600/10" />
-                            Verified
-                          </div>
-                        )}
-                        {getBadge(donor.donationCount) && (
-                          <div className={cn(
-                            "flex items-center gap-0.5 px-1.5 py-0.5 bg-zinc-50 dark:bg-zinc-900/20 rounded-full text-[8px] font-bold border border-zinc-100 dark:border-zinc-800",
-                            getBadge(donor.donationCount)?.color
-                          )}>
-                            <span>{getBadge(donor.donationCount)?.icon}</span>
-                            {getBadge(donor.donationCount)?.name}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <div className={cn(
-                          "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold border",
-                          canDonate(donor.lastDonationDate) 
-                            ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-100 dark:border-emerald-900/30" 
-                            : "bg-red-50 dark:bg-red-900/20 text-red-600 border-red-100 dark:border-red-900/30"
-                        )}>
-                          <div className={cn(
-                            "h-1.5 w-1.5 rounded-full",
-                            canDonate(donor.lastDonationDate) ? "bg-emerald-500" : "bg-red-500"
-                          )} />
-                          {canDonate(donor.lastDonationDate) ? "Available" : "Unavailable"}
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-zinc-500 flex items-center gap-1 mt-0.5">
-                        <MapPin className="h-2.5 w-2.5" />
-                        {donor.district}, {donor.division}
-                      </p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-black text-zinc-900 dark:text-white leading-tight">
+                        {donor.name}
+                      </h3>
+                      {donor.isVerified && (
+                        <CheckCircle className="h-4 w-4 text-blue-500 fill-blue-500/10" />
+                      )}
                     </div>
+                    <div className="flex items-center gap-1.5 text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                      <MapPin className="h-3 w-3 text-red-600" />
+                      {donor.upazila}, {donor.district}
+                    </div>
+                  </div>
                 </div>
-                <div className="px-2 py-0.5 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-lg font-bold text-base">
+                <div className="h-12 w-12 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-2xl flex items-center justify-center font-black text-xl shadow-sm border border-red-100 dark:border-red-900/30">
                   {donor.bloodGroup}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                <div className="space-y-0.5">
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase">Donations</p>
-                  <p className="font-bold text-sm text-zinc-900 dark:text-white">{donor.donationCount}</p>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                  <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Donations</div>
+                  <div className="text-lg font-black text-zinc-900 dark:text-white">{donor.donationCount}</div>
                 </div>
-                <div className="space-y-0.5">
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase">Last Donation</p>
-                  <p className="font-bold text-sm text-zinc-900 dark:text-white truncate">{donor.lastDonationDate || 'Never'}</p>
+                <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                  <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Status</div>
+                  <div className={cn(
+                    "text-xs font-black uppercase tracking-widest",
+                    canDonate(donor.lastDonationDate) ? "text-emerald-600" : "text-red-600"
+                  )}>
+                    {canDonate(donor.lastDonationDate) ? "Available" : "Wait"}
+                  </div>
                 </div>
               </div>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleBookmark(donor.uid);
-                    }}
-                    className={cn(
-                      "p-2.5 rounded-xl transition-all",
-                      profile?.bookmarks?.includes(donor.uid)
-                        ? "bg-red-100 dark:bg-red-900/20 text-red-600"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                    )}
-                    title="Bookmark Donor"
-                  >
-                    <Bookmark className={cn("h-4 w-4", profile?.bookmarks?.includes(donor.uid) && "fill-current")} />
-                  </button>
-                  <a
-                    href={`tel:${donor.phone}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex-1 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:opacity-90 transition-all"
-                  >
-                    <Phone className="h-3.5 w-3.5" />
-                    {t('call')}
-                  </a>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startChat(donor);
-                    }}
-                    className="p-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
-                    title="Message Donor"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addToContacts(donor);
-                    }}
-                    className="p-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
-                    title="Add to Contacts"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleShare(donor);
-                    }}
-                    className="p-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </button>
-                </div>
+              <div className="mt-auto flex gap-2">
+                <a
+                  href={`tel:${donor.phone}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 py-3.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-xl shadow-zinc-900/20 dark:shadow-white/10"
+                >
+                  <Phone className="h-4 w-4" />
+                  {t('call')}
+                </a>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startChat(donor);
+                  }}
+                  className="p-3.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-2xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+                  title="Message Donor"
+                >
+                  <MessageSquare className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleBookmark(donor.uid);
+                  }}
+                  className={cn(
+                    "p-3.5 rounded-2xl transition-all",
+                    profile?.bookmarks?.includes(donor.uid)
+                      ? "bg-red-50 dark:bg-red-900/20 text-red-600 border border-red-100 dark:border-red-900/30"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                  )}
+                >
+                  <Bookmark className={cn("h-5 w-5", profile?.bookmarks?.includes(donor.uid) && "fill-current")} />
+                </button>
+              </div>
             </motion.div>
           )) : (
-            <div className="col-span-full text-center py-20 space-y-4">
-              <div className="h-20 w-20 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto">
-                <SearchIcon className="h-10 w-10 text-zinc-400" />
+            <div className="col-span-full text-center py-32 space-y-6">
+              <div className="h-24 w-24 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto">
+                <SearchIcon className="h-12 w-12 text-zinc-400" />
               </div>
-              <p className="text-zinc-500 font-medium">No donors found matching your criteria.</p>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-zinc-900 dark:text-white">No Donors Found</h3>
+                <p className="text-zinc-500 font-medium max-w-sm mx-auto">We couldn't find any donors matching your current filters. Try broadening your search.</p>
+              </div>
             </div>
           )}
         </div>

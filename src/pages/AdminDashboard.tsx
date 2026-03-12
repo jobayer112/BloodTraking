@@ -112,19 +112,28 @@ const AdminDashboard = () => {
         locations: locationData,
         inviters: inviterData
       });
+    }, (error) => {
+      console.error("Admin Users Stats Error:", error);
     });
 
     const unsubRequests = onSnapshot(query(collection(db, 'bloodRequests'), where('status', '==', 'open')), (snap) => {
       setStats(prev => ({ ...prev, emergencyRequests: snap.size }));
+    }, (error) => {
+      console.error("Admin Requests Stats Error:", error);
     });
 
     const unsubPosts = onSnapshot(collection(db, 'posts'), (snap) => {
       setStats(prev => ({ ...prev, totalPosts: snap.size }));
+    }, (error) => {
+      console.error("Admin Posts Stats Error:", error);
     });
 
     // Real-time Users List
     const unsubUsersList = onSnapshot(query(collection(db, 'users'), limit(50)), (snap) => {
       setUsers(snap.docs.map(doc => doc.data() as UserProfile));
+      setLoading(false);
+    }, (error) => {
+      console.error("Admin Users List Error:", error);
       setLoading(false);
     });
 

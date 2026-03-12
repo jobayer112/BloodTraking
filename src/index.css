@@ -5,31 +5,48 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Space Grotesk", sans-serif;
 }
 
 @layer base {
   body {
-    @apply antialiased text-zinc-900 bg-white dark:bg-zinc-950 dark:text-zinc-100;
+    @apply antialiased text-zinc-900 bg-white dark:bg-zinc-950 dark:text-zinc-100 selection:bg-red-100 dark:selection:bg-red-900/30;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply px-4 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-600/20 text-sm;
+    @apply px-6 py-3 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-600/20 text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-2xl font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-95 text-sm flex items-center justify-center gap-2;
   }
   
   .card {
-    @apply bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-4;
+    @apply bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm p-6 hover:shadow-md transition-shadow;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 focus:bg-white dark:focus:bg-zinc-800 transition-all text-sm;
+  }
+
+  .label-text {
+    @apply text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 block;
   }
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-zinc-50 dark:bg-zinc-900;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -38,5 +55,16 @@
 
 /* Glassmorphism */
 .glass {
-  @apply bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-white/20 dark:border-zinc-800/50;
+  @apply bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border border-white/20 dark:border-zinc-800/50;
+}
+
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
 }
